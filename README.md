@@ -1,0 +1,2 @@
+# The-Smart-Municipal-Service-Reporting-and-Analytics-System
+a multi-layered digital platform consisting of three main parts: a mobile application for citizens, a web-based dashboard for municipal staff, and a robust backend infrastructure. The system is designed to digitise the entire lifecycle of a municipal service request, from initial citizen report through to resolution and public confirmation. 

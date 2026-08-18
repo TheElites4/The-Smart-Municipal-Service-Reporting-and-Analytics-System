@@ -1,0 +1,19 @@
+<resources>
+    <string name="app_name">MzansiReport</string>
+    <string name="slogan">Smart Municipal Services</string>
+    <string name="mission">Empowering South African communities through transparent, efficient, and accountable municipal service delivery. Bridging the gap between citizens and government services.</string>
+
+    <!-- English -->
+    <string name="welcome">Welcome</string>
+    <string name="sos_title">Emergency SOS</string>
+    <string name="sos_desc">Tap for immediate assistance</string>
+    <string name="how_it_works">How it Works</string>
+
+    <!-- isiZulu -->
+    <string name="welcome_zu">Siyakwamukela</string>
+    <string name="sos_title_zu">Ezoxhumana eziphuthumayo</string>
+
+    <!-- Afrikaans -->
+    <string name="welcome_af">Welkom</string>
+    <string name="sos_title_af">Noodhulp</string>
+</resources>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="135"
+                android:endColor="@color/portal_bg_end"
+                android:startColor="@color/portal_bg_start"
+                android:type="linear" />
+        </shape>
+    </item>
+    <!-- Actual vibrancy with the background image -->
+    <item>
+        <bitmap
+            android:src="@drawable/background"
+            android:alpha="0.4"
+            android:gravity="center"
+            android:tileMode="disabled" />
+    </item>
+</layer-list>

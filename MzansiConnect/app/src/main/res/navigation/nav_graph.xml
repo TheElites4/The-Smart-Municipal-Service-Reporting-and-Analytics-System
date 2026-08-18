@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/navigation_splash">
+
+    <fragment
+        android:id="@+id/navigation_splash"
+        android:name="com.example.mzansiconnect.ui.auth.SplashFragment"
+        android:label="Splash"
+        tools:layout="@layout/fragment_splash">
+        <action
+            android:id="@+id/action_splash_to_login"
+            app:destination="@id/navigation_home"
+            app:popUpTo="@id/navigation_splash"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/navigation_registration"
+        android:name="com.example.mzansiconnect.ui.auth.RegistrationFragment"
+        android:label="Registration"
+        tools:layout="@layout/fragment_registration" />
+
+    <fragment
+        android:id="@+id/navigation_login"
+        android:name="com.example.mzansiconnect.ui.auth.LoginFragment"
+        android:label="Login"
+        tools:layout="@layout/fragment_login">
+        <action
+            android:id="@+id/action_login_to_mfa"
+            app:destination="@id/navigation_mfa" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/navigation_mfa"
+        android:name="com.example.mzansiconnect.ui.auth.MfaFragment"
+        android:label="Verification"
+        tools:layout="@layout/fragment_mfa">
+        <action
+            android:id="@+id/action_mfa_to_success"
+            app:destination="@id/navigation_mfa_success" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/navigation_mfa_success"
+        android:name="com.example.mzansiconnect.ui.auth.MfaSuccessFragment"
+        android:label="Success"
+        tools:layout="@layout/fragment_mfa_success">
+        <action
+            android:id="@+id/action_mfaSuccess_to_dashboard"
+            app:destination="@id/navigation_dashboard"
+            app:popUpTo="@id/navigation_home"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/navigation_dashboard"
+        android:name="com.example.mzansiconnect.ui.dashboard.DashboardFragment"
+        android:label="Dashboard"
+        tools:layout="@layout/fragment_dashboard">
+        <action
+            android:id="@+id/action_dashboard_to_submission"
+            app:destination="@id/navigation_report_submission" />
+        <action
+            android:id="@+id/action_dashboard_to_detail"
+            app:destination="@id/navigation_report_detail" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/navigation_report_submission"
+        android:name="com.example.mzansiconnect.ui.report.ReportSubmissionFragment"
+        android:label="New Report"
+        tools:layout="@layout/fragment_report_submission" />
+
+    <fragment
+        android:id="@+id/navigation_report_detail"
+        android:name="com.example.mzansiconnect.ui.report.ReportDetailFragment"
+        android:label="Report Tracking"
+        tools:layout="@layout/fragment_report_detail" />
+
+    <fragment
+        android:id="@+id/navigation_home"
+        android:name="com.example.mzansiconnect.ui.home.HomeFragment"
+        android:label="Home"
+        tools:layout="@layout/fragment_home" />
+
+    <fragment
+        android:id="@+id/navigation_services"
+        android:name="com.example.mzansiconnect.ui.services.ServicesFragment"
+        android:label="Services"
+        tools:layout="@layout/fragment_services">
+        <action
+            android:id="@+id/action_services_to_detail"
+            app:destination="@id/navigation_service_detail" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/navigation_service_detail"
+        android:name="com.example.mzansiconnect.ui.services.ServiceDetailFragment"
+        android:label="Service Details"
+        tools:layout="@layout/fragment_service_detail" />
+
+    <fragment
+        android:id="@+id/navigation_profile"
+        android:name="com.example.mzansiconnect.ui.profile.ProfileFragment"
+        android:label="Profile"
+        tools:layout="@layout/fragment_profile" />
+
+    <fragment
+        android:id="@+id/navigation_notifications"
+        android:name="com.example.mzansiconnect.ui.notifications.NotificationsFragment"
+        android:label="Notifications"
+        tools:layout="@layout/fragment_notifications" />
+
+    <fragment
+        android:id="@+id/navigation_service_status"
+        android:name="com.example.mzansiconnect.ui.status.ServiceStatusFragment"
+        android:label="Live Status"
+        tools:layout="@layout/fragment_service_status" />
+
+    <fragment
+        android:id="@+id/navigation_analytics"
+        android:name="com.example.mzansiconnect.ui.analytics.AnalyticsFragment"
+        android:label="Insights"
+        tools:layout="@layout/fragment_analytics" />
+
+    <fragment
+        android:id="@+id/navigation_chatbot"
+        android:name="com.example.mzansiconnect.ui.chatbot.ChatbotFragment"
+        android:label="AI Assistant"
+        tools:layout="@layout/fragment_chatbot" />
+
+    <fragment
+        android:id="@+id/navigation_leaderboard"
+        android:name="com.example.mzansiconnect.ui.leaderboard.LeaderboardFragment"
+        android:label="Leaderboard"
+        tools:layout="@layout/fragment_leaderboard" />
+</navigation>

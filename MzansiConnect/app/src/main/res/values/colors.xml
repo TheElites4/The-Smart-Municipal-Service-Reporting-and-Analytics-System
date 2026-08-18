@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="primary">#007A4D</color> <!-- SA Green -->
+    <color name="primary_dark">#004d31</color>
+    <color name="accent">#FFB81C</color> <!-- SA Gold -->
+    <color name="red">#DE3831</color> <!-- SA Red -->
+    <color name="blue">#002395</color> <!-- SA Blue -->
+
+    <!-- Portal Design Colors -->
+    <color name="portal_bg_start">#0B4D3C</color>
+    <color name="portal_bg_end">#06304D</color>
+    <color name="portal_glass">#33FFFFFF</color>
+    <color name="portal_input_bg">#26FFFFFF</color>
+    <color name="portal_badge_green">#2ECC71</color>
+    <color name="portal_badge_blue">#3498DB</color>
+    <color name="portal_button_orange">#F39C12</color>
+    <color name="portal_text_secondary">#BDC3C7</color>
+</resources>

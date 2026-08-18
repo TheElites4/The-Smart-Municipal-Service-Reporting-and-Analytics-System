@@ -1,0 +1,329 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/portal_background">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- Custom Top Bar with Language Toggle -->
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="70dp"
+                android:paddingHorizontal="20dp"
+                android:background="#1A000000">
+                <ImageView
+                    android:id="@+id/home_logo"
+                    android:layout_width="50dp"
+                    android:layout_height="50dp"
+                    android:layout_centerVertical="true"
+                    android:src="@drawable/logo" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_toEndOf="@id/home_logo"
+                    android:layout_centerVertical="true"
+                    android:layout_marginStart="12dp"
+                    android:text="MzansiReport"
+                    android:textColor="@color/white"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:orientation="horizontal"
+                    android:background="@drawable/glass_card"
+                    android:backgroundTint="#33FFFFFF"
+                    android:padding="4dp">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="EN" android:textColor="@color/accent" android:textSize="10sp" android:textStyle="bold" android:paddingHorizontal="4dp" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="ZU" android:textColor="@color/white" android:textSize="10sp" android:paddingHorizontal="4dp" />
+                </LinearLayout>
+            </RelativeLayout>
+
+            <!-- EMERGENCY SOS SECTION -->
+            <androidx.cardview.widget.CardView
+                android:id="@+id/card_sos"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="24dp"
+                android:layout_marginTop="16dp"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="8dp"
+                android:backgroundTint="@color/red">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:padding="16dp"
+                    android:gravity="center_vertical">
+                    <ImageView
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:src="@drawable/ic_sos" />
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="16dp"
+                        android:orientation="vertical">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/sos_title"
+                            android:textColor="@color/white"
+                            android:textStyle="bold"
+                            android:textSize="16sp" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/sos_desc"
+                            android:textColor="@color/white"
+                            android:textSize="12sp"
+                            android:alpha="0.9" />
+                    </LinearLayout>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="PANIC"
+                        android:textColor="@color/white"
+                        android:textStyle="bold"
+                        android:background="#33000000"
+                        android:paddingHorizontal="12dp"
+                        android:paddingVertical="6dp" />
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <!-- Hero Section -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingHorizontal="32dp"
+                android:paddingTop="32dp"
+                android:paddingBottom="24dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Smart Municipal Services"
+                    android:textColor="@color/accent"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.1" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Empowering Communities"
+                    android:textColor="@color/white"
+                    android:textSize="32sp"
+                    android:textStyle="bold"
+                    android:textAlignment="center" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="@string/mission"
+                    android:textColor="@color/portal_text_secondary"
+                    android:textAlignment="center"
+                    android:textSize="14sp"
+                    android:lineSpacingExtra="4dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="24dp"
+                    android:gravity="center"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/btn_get_started"
+                        android:layout_width="0dp"
+                        android:layout_height="54dp"
+                        android:layout_weight="1"
+                        android:text="Get Started"
+                        android:backgroundTint="@color/portal_button_orange"
+                        android:textColor="@color/white"
+                        android:textStyle="bold"
+                        android:layout_marginEnd="8dp"
+                        android:textAllCaps="false" />
+
+                    <Button
+                        android:id="@+id/btn_home_login"
+                        android:layout_width="0dp"
+                        android:layout_height="54dp"
+                        android:layout_weight="1"
+                        android:text="Staff Login"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:textColor="@color/white"
+                        app:strokeColor="@color/white"
+                        android:layout_marginStart="8dp"
+                        android:textAllCaps="false" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Decorative Flag Stripe -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="10dp"
+                android:orientation="horizontal">
+                <View android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@color/red" />
+                <View android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@color/blue" />
+                <View android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@color/primary" />
+                <View android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@color/accent" />
+                <View android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@color/black" />
+            </LinearLayout>
+
+            <!-- Features Cards -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="24dp"
+                android:orientation="vertical"
+                android:background="#F8F9FA">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="How it Works"
+                    android:textSize="22sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/portal_bg_start" />
+
+                <HorizontalScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:scrollbars="none">
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <!-- Step 1 -->
+                        <androidx.cardview.widget.CardView
+                            android:layout_width="220dp"
+                            android:layout_height="wrap_content"
+                            android:layout_margin="8dp"
+                            app:cardCornerRadius="16dp"
+                            app:cardElevation="4dp">
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:padding="20dp">
+                                <ImageView android:layout_width="48dp" android:layout_height="48dp" android:src="@drawable/whatsapp_image_1" android:scaleType="centerCrop" />
+                                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="1. AI Report" android:textStyle="bold" android:layout_marginTop="12dp" android:textColor="@color/primary" />
+                                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Take a photo; our AI detects the issue category automatically." android:textSize="13sp" android:alpha="0.7" />
+                            </LinearLayout>
+                        </androidx.cardview.widget.CardView>
+
+                        <!-- Step 2 -->
+                        <androidx.cardview.widget.CardView
+                            android:layout_width="220dp"
+                            android:layout_height="wrap_content"
+                            android:layout_margin="8dp"
+                            app:cardCornerRadius="16dp"
+                            app:cardElevation="4dp">
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:padding="20dp">
+                                <ImageView android:layout_width="48dp" android:layout_height="48dp" android:src="@drawable/whatsapp_image_2" android:scaleType="centerCrop" />
+                                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="2. GPS Tag" android:textStyle="bold" android:layout_marginTop="12dp" android:textColor="@color/blue" />
+                                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Smart geo-tagging alerts your nearest municipality." android:textSize="13sp" android:alpha="0.7" />
+                            </LinearLayout>
+                        </androidx.cardview.widget.CardView>
+
+                        <!-- Step 3 -->
+                        <androidx.cardview.widget.CardView
+                            android:layout_width="220dp"
+                            android:layout_height="wrap_content"
+                            android:layout_margin="8dp"
+                            app:cardCornerRadius="16dp"
+                            app:cardElevation="4dp">
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:padding="20dp">
+                                <ImageView android:layout_width="48dp" android:layout_height="48dp" android:src="@drawable/whatsapp_image_3" android:scaleType="centerCrop" />
+                                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="3. Resolution" android:textStyle="bold" android:layout_marginTop="12dp" android:textColor="@color/portal_button_orange" />
+                                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Track progress and earn Community Hero points." android:textSize="13sp" android:alpha="0.7" />
+                            </LinearLayout>
+                        </androidx.cardview.widget.CardView>
+
+                    </LinearLayout>
+                </HorizontalScrollView>
+            </LinearLayout>
+
+            <!-- Statistics Dashboard -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@color/portal_bg_start"
+                android:padding="32dp"
+                android:orientation="vertical"
+                android:gravity="center">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Our Real-time Impact"
+                    android:textColor="@color/white"
+                    android:textSize="22sp"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="24dp"
+                    android:orientation="horizontal">
+
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="15,420" android:textSize="26sp" android:textStyle="bold" android:textColor="@color/accent" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Reports Resolved" android:textColor="@color/portal_text_secondary" android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="2,105" android:textSize="26sp" android:textStyle="bold" android:textColor="@color/portal_badge_blue" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Active Cases" android:textColor="@color/portal_text_secondary" android:textSize="12sp" />
+                    </LinearLayout>
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Footer -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@color/black"
+                android:padding="40dp"
+                android:gravity="center"
+                android:orientation="vertical">
+                <ImageView android:layout_width="40dp" android:layout_height="40dp" android:src="@drawable/logo" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:text="MzansiReport" android:textColor="@color/white" android:textStyle="bold" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Building a better South Africa, one report at a time." android:textColor="#888" android:textSize="12sp" android:textAlignment="center" android:layout_marginTop="4dp" />
+                <View android:layout_width="50dp" android:layout_height="1dp" android:background="#444" android:layout_marginVertical="16dp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="© 2026 Smart Municipal Services" android:textColor="#666" android:textSize="11sp" />
+            </LinearLayout>
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

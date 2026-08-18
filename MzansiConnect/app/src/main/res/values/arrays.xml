@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="report_categories">
+        <item>Water</item>
+        <item>Electricity</item>
+        <item>Roads</item>
+        <item>Sanitation</item>
+        <item>Waste Management</item>
+        <item>Street Lighting</item>
+        <item>Other</item>
+    </string-array>
+</resources>

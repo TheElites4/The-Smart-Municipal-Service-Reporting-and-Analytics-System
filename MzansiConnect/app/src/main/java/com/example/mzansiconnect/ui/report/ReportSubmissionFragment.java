@@ -55,11 +55,18 @@ public class ReportSubmissionFragment extends Fragment {
         });
 
         submitBtn.setOnClickListener(v -> {
+            String description = descEdit.getText().toString().trim();
+            String location = locationEdit.getText().toString().trim();
+            String municipality = municipalityTv.getText().toString().replace("Nearest: ", "").trim();
+            if (description.length() < 20 || location.isEmpty() || municipality.isEmpty()) {
+                Toast.makeText(requireContext(), "Add a detailed description, location, and municipality before submitting.", Toast.LENGTH_LONG).show();
+                return;
+            }
             Report report = new Report();
             report.category = categorySpinner.getSelectedItem().toString();
-            report.description = descEdit.getText().toString();
-            report.location = locationEdit.getText().toString();
-            report.municipality = municipalityTv.getText().toString().replace("Nearest: ", "");
+            report.description = description;
+            report.location = location;
+            report.municipality = municipality;
             report.status = "Submitted";
             report.timestamp = System.currentTimeMillis();
             report.userId = 1;
@@ -71,7 +78,7 @@ public class ReportSubmissionFragment extends Fragment {
                 Toast.makeText(getContext(), "EMERGENCY BROADCAST SENT TO NEARBY USERS", Toast.LENGTH_LONG).show();
             }
             
-            Toast.makeText(getContext(), "Synced to SQL + Firebase + MongoDB", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), "Saved locally and queued for cloud synchronization.", Toast.LENGTH_SHORT).show();
             requireActivity().onBackPressed();
         });
 

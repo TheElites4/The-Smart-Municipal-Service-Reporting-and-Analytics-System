@@ -24,6 +24,13 @@ type Screen =
   | 'report-detail'
   | 'community';
 
+const toCitizenReport = (report: any) => ({
+  ...report,
+  id: report.id || report.public_reference,
+  date: report.date || report.created_at,
+  status: report.status?.replace('_', '-') || 'submitted',
+});
+
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -41,8 +48,23 @@ export default function App() {
     }
 
     const savedReports = localStorage.getItem('reports');
-    if (savedReports) {
-      setReports(JSON.parse(savedReports));
+    if (savedReports) setReports(JSON.parse(savedReports));
+    const citizen = user ? JSON.parse(user) : {};
+    if (citizen.id) {
+      fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8787'}/api/reports?citizenId=${encodeURIComponent(citizen.id)}`)
+        .then((response) => response.ok ? response.json() : null)
+        .then((remoteReports) => { if (remoteReports) setReports(remoteReports.map(toCitizenReport)); })
+        .catch(() => undefined);
+    }
+    if (citizen.id && window.EventSource) {
+      const events = new EventSource(`${import.meta.env.VITE_API_URL || 'http://localhost:8787'}/api/events`);
+      const refreshReports = () => fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8787'}/api/reports?citizenId=${encodeURIComponent(citizen.id)}`)
+        .then((response) => response.ok ? response.json() : null)
+        .then((remoteReports) => { if (remoteReports) setReports(remoteReports.map(toCitizenReport)); })
+        .catch(() => undefined);
+      events.addEventListener('report.updated', refreshReports);
+      events.addEventListener('report.created', refreshReports);
+      return () => events.close();
     }
   }, []);
 
@@ -66,7 +88,21 @@ export default function App() {
     setReports([]);
   };
 
-const handleSubmitReport = (report: any) => {
+const handleSubmitReport = async (report: any) => {
+    const citizen = JSON.parse(localStorage.getItem('user') || '{}');
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8787'}/api/reports`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ...report, citizenId: citizen.id }),
+      });
+      if (response.ok) {
+        const remoteReport = await response.json();
+        report = toCitizenReport({ ...report, ...remoteReport, id: remoteReport.public_reference || remoteReport.id, date: remoteReport.created_at || report.date });
+      }
+    } catch {
+      // Keep local persistence as an offline queue until the API is reachable.
+    }
     const updatedReports = [...reports, report];
     setReports(updatedReports);
     localStorage.setItem('reports', JSON.stringify(updatedReports));

@@ -15,6 +15,7 @@ import androidx.navigation.Navigation;
 import com.example.mzansiconnect.R;
 import com.example.mzansiconnect.data.DataRepository;
 import com.example.mzansiconnect.data.User;
+import com.example.mzansiconnect.data.FirebaseManager;
 import java.util.concurrent.Executors;
 
 public class LoginFragment extends Fragment {
@@ -40,9 +41,21 @@ public class LoginFragment extends Fragment {
                 return;
             }
 
-            // In a real app, you'd verify against SQL/Firebase here
-            // For now, let's proceed to MFA as per the portal design
-            Navigation.findNavController(v).navigate(R.id.action_login_to_mfa);
+            loginBtn.setEnabled(false);
+            if (FirebaseManager.getInstance().getAuth() == null) {
+                loginBtn.setEnabled(true);
+                Toast.makeText(requireContext(), "Authentication service is unavailable.", Toast.LENGTH_LONG).show();
+                return;
+            }
+            FirebaseManager.getInstance().getAuth().signInWithEmailAndPassword(email, pass)
+                    .addOnSuccessListener(result -> {
+                        if (isAdded()) Navigation.findNavController(v).navigate(R.id.action_login_to_mfa);
+                    })
+                    .addOnFailureListener(error -> {
+                        if (!isAdded()) return;
+                        loginBtn.setEnabled(true);
+                        Toast.makeText(requireContext(), "Sign in failed. Check your email and password.", Toast.LENGTH_LONG).show();
+                    });
         });
 
         return root;

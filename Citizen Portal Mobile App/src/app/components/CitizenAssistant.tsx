@@ -123,7 +123,7 @@ export function CitizenAssistant() {
       {/* Floating button */}
       <button
         onClick={() => setOpen(!open)}
-        className="fixed bottom-6 left-6 z-40 flex items-center gap-2 px-4 py-3 rounded-full bg-[#1e5a7d] text-white font-bold shadow-2xl hover:bg-[#162f4d] active:scale-95 transition-all"
+        className="fixed bottom-6 left-6 z-40 flex items-center gap-2 px-4 py-3 rounded-full bg-[#173d3c] text-white font-bold shadow-2xl hover:bg-[#176b5b] active:scale-95 transition-all"
         aria-label="Citizen Assistant"
       >
         <Bot className="w-6 h-6" />
@@ -133,7 +133,7 @@ export function CitizenAssistant() {
       {/* Chat window */}
       {open && (
         <div className="fixed bottom-24 left-6 z-50 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col max-h-[70vh]">
-          <div className="bg-gradient-to-r from-[#1e5a7d] to-[#4a8f8f] p-4 text-white flex items-center justify-between">
+          <div className="bg-gradient-to-r from-[#173d3c] to-[#176b5b] p-4 text-white flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
                 <Bot className="w-6 h-6" />

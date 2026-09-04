@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MzansiConnect | Staff Operations</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header><div><span class="eyebrow">MZANSICONNECT / OPERATIONS</span><h1>Service queue</h1><p>Keep citizens informed and move every job toward resolution.</p><span class="live-status"><i></i><span id="live-status">Connecting live updates</span></span></div><label>Municipality <input id="municipality" placeholder="All municipalities"></label></header>
+  <main>
+    <section class="metrics" id="metrics"></section>
+    <section class="toolbar"><div><h2>Open work</h2><p id="updated">Waiting for live data</p></div><button id="refresh">Refresh queue</button></section>
+    <section class="queue" id="queue"></section>
+  </main>
+  <template id="job-template"><article class="job"><div class="job-head"><div><span class="reference"></span><h3 class="category"></h3></div><span class="urgency"></span></div><p class="description"></p><div class="job-meta"><span class="location"></span><span class="citizen"></span></div><div class="job-actions"><select class="status"><option value="submitted">Submitted</option><option value="under_review">Under review</option><option value="assigned">Assigned</option><option value="in_progress">In progress</option><option value="resolved">Resolved</option><option value="closed">Closed</option></select><button class="save">Update status</button></div></article></template>
+  <script src="app.js"></script>
+</body>
+</html>

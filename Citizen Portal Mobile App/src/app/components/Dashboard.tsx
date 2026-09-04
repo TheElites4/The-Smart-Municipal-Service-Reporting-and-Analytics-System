@@ -64,7 +64,7 @@ export function Dashboard({
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Navigation Bar */}
-      <nav className="sticky top-0 z-50 bg-gradient-to-r from-[#1e5a7d] to-[#4a8f8f] shadow-md">
+      <nav className="sticky top-0 z-50 bg-gradient-to-r from-[#173d3c] to-[#176b5b] shadow-md">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">

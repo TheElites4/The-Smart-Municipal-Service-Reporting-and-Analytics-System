@@ -1,22 +1,23 @@
 @custom-variant dark (&:is(.dark *));
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap');
 
 :root {
   --font-size: 16px;
-  --background: #ffffff;
-  --foreground: #1a1a1a;
+  --background: #f3f7f3;
+  --foreground: #17383a;
   --card: #ffffff;
   --card-foreground: #1a1a1a;
   --popover: #ffffff;
   --popover-foreground: #1a1a1a;
-  --primary: #1e5a7d;
+  --primary: #176b5b;
   --primary-foreground: #ffffff;
-  --secondary: #4a8f8f;
+  --secondary: #173d3c;
   --secondary-foreground: #ffffff;
   --muted: #f5f5f5;
   --muted-foreground: #666666;
-  --accent: #FFB612;
+  --accent: #f4b942;
   --accent-foreground: #1a1a1a;
-  --destructive: #E03C31;
+  --destructive: #d65c4d;
   --destructive-foreground: #ffffff;
   --border: rgba(0, 0, 0, 0.1);
   --input: transparent;
@@ -24,7 +25,7 @@
   --switch-background: #cbced4;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
-  --ring: #1e5a7d;
+  --ring: #176b5b;
   --chart-1: #1e5a7d;
   --chart-2: #4a8f8f;
   --chart-3: #E03C31;
@@ -126,6 +127,13 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: 'DM Sans', sans-serif;
+    background-image: linear-gradient(rgba(23, 107, 91, 0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(23, 107, 91, 0.035) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: 'Space Grotesk', sans-serif;
   }
 
   /**

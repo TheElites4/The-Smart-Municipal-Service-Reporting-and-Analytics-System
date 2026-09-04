@@ -6,7 +6,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -51,9 +50,22 @@ public class RegistrationFragment extends Fragment {
             user.email = email;
             user.password = pass;
 
-            DataRepository.getInstance(getContext()).registerUser(user, pass);
-            Toast.makeText(getContext(), "Registration Successful!", Toast.LENGTH_SHORT).show();
-            Navigation.findNavController(v).navigate(R.id.navigation_login);
+            regBtn.setEnabled(false);
+            DataRepository.getInstance(requireContext()).registerUser(user, pass, new DataRepository.RegistrationCallback() {
+                @Override
+                public void onSuccess() {
+                    if (!isAdded()) return;
+                    Toast.makeText(requireContext(), "Registration successful. You can now sign in.", Toast.LENGTH_SHORT).show();
+                    Navigation.findNavController(root).navigate(R.id.navigation_login);
+                }
+
+                @Override
+                public void onFailure(String message) {
+                    if (!isAdded()) return;
+                    regBtn.setEnabled(true);
+                    Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show();
+                }
+            });
         });
 
         return root;

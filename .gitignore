@@ -1,0 +1,12 @@
+backend/.env
+backend/.env.*
+!backend/.env.example
+Citizen Portal Mobile App/.env.local
+Citizen Portal Mobile App/.env.*.local
+!Citizen Portal Mobile App/.env.example
+MzansiConnect/gradle.properties
+MzansiConnect/local.properties
+MzansiConnect/app/google-services.json
+MzansiConnect/app/build/
+Citizen Portal Mobile App/dist/
+node_modules/

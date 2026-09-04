@@ -1,0 +1,4 @@
+# Copy the API_BASE_URL line into gradle.properties or pass -PAPI_BASE_URL=...
+# Android emulator: http://10.0.2.2:8787/
+# Physical device / production: use a deployed HTTPS URL ending with '/'.
+API_BASE_URL=https://api.example.gov.za/

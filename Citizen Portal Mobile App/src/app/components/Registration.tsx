@@ -89,7 +89,19 @@ export function Registration({ onSuccess, onSwitchToLogin, onBackHome, language,
 
     setIsLoading(true);
 
-    setTimeout(() => {
+    setTimeout(async () => {
+      let citizenId: string | undefined;
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8787'}/api/users/citizen`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ fullName: formData.fullName, email: formData.email, phone: formData.phone }),
+        });
+        if (response.ok) citizenId = (await response.json()).id;
+      } catch {
+        // Keep the demo flow usable when the API is not configured.
+      }
+      if (citizenId) localStorage.setItem('pendingCitizenId', citizenId);
       setIsLoading(false);
       setFormData({ ...formData, mfaPhone: formData.phone });
       setStep('mfa-setup');
@@ -105,12 +117,14 @@ export function Registration({ onSuccess, onSwitchToLogin, onBackHome, language,
 
     setTimeout(() => {
       localStorage.setItem('user', JSON.stringify({
+        id: localStorage.getItem('pendingCitizenId') || undefined,
         fullName: formData.fullName,
         idNumber: formData.idNumber,
         email: formData.email,
         phone: formData.phone,
         mfaEnabled: true,
       }));
+      localStorage.removeItem('pendingCitizenId');
       setIsLoading(false);
       onSuccess();
     }, 1500);

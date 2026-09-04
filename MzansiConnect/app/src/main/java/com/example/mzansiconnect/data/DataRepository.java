@@ -2,6 +2,12 @@ package com.example.mzansiconnect.data;
 
 import android.content.Context;
 import android.util.Log;
+import com.google.firebase.auth.FirebaseUser;
+import java.util.HashMap;
+import java.util.Map;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
 
@@ -11,6 +17,10 @@ import java.util.concurrent.ExecutorService;
  * Firebase logic is abstracted to FirebaseManager for cleaner code.
  */
 public class DataRepository {
+    public interface RegistrationCallback {
+        void onSuccess();
+        void onFailure(String message);
+    }
     private static DataRepository instance;
     private final AppDatabase sqlDb;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -27,6 +37,10 @@ public class DataRepository {
     }
 
     public void registerUser(User user, String password) {
+        registerUser(user, password, null);
+    }
+
+    public void registerUser(User user, String password, RegistrationCallback callback) {
         // 1. SAVE TO LOCAL SQL (Works Real-Life)
         executor.execute(() -> sqlDb.appDao().registerUser(user));
 
@@ -35,12 +49,20 @@ public class DataRepository {
         if (fm.getAuth() != null) {
             fm.getAuth().createUserWithEmailAndPassword(user.email, password)
                     .addOnSuccessListener(authResult -> {
-                        if (authResult.getUser() != null && fm.getFirestore() != null) {
-                            fm.getFirestore().collection("users")
-                                    .document(authResult.getUser().getUid()).set(user);
+                        if (authResult.getUser() != null) {
+                            if (fm.getFirestore() != null) {
+                                fm.getFirestore().collection("users")
+                                        .document(authResult.getUser().getUid()).set(user);
+                            }
+                            syncUserToSharedApi(user, authResult.getUser().getUid(), callback);
                         }
                     })
-                    .addOnFailureListener(e -> Log.e("DataRepo", "Firebase Auth Failed: " + e.getMessage()));
+                    .addOnFailureListener(e -> {
+                        Log.e("DataRepo", "Firebase Auth Failed: " + e.getMessage());
+                        if (callback != null) callback.onFailure("Registration failed. Please check your details and try again.");
+                    });
+        } else if (callback != null) {
+            callback.onFailure("Authentication service is unavailable.");
         }
     }
 
@@ -57,7 +79,52 @@ public class DataRepository {
             fm.getDatabase().getReference("live_feed").push().setValue(report);
         }
 
-        // 3. MONGODB ATLAS (Via REST Interface)
-        Log.d("MzansiReport", "Data captured locally and queued for cloud synchronization.");
+        FirebaseUser firebaseUser = fm.getAuth() == null ? null : fm.getAuth().getCurrentUser();
+        if (firebaseUser != null) {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("externalRef", firebaseUser.getUid());
+            payload.put("category", report.category);
+            payload.put("description", report.description);
+            payload.put("location", report.location);
+            payload.put("municipality", report.municipality);
+            payload.put("urgency", report.urgency == null ? "medium" : report.urgency.toLowerCase());
+            SharedApi.service().submitReport(payload).enqueue(new Callback<Map<String, Object>>() {
+                @Override
+                public void onResponse(Call<Map<String, Object>> call, Response<Map<String, Object>> response) {
+                    if (!response.isSuccessful()) Log.e("DataRepo", "Shared API report sync failed: " + response.code());
+                }
+
+                @Override
+                public void onFailure(Call<Map<String, Object>> call, Throwable throwable) {
+                    Log.e("DataRepo", "Shared API report sync unavailable", throwable);
+                }
+            });
+        }
+        Log.d("MzansiReport", "Report saved to Room and queued for Firebase plus shared API synchronization.");
+    }
+
+    private void syncUserToSharedApi(User user, String externalRef, RegistrationCallback callback) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("fullName", user.fullName);
+        payload.put("email", user.email);
+        payload.put("phone", user.phoneNumber);
+        payload.put("externalRef", externalRef);
+        SharedApi.service().registerCitizen(payload).enqueue(new Callback<Map<String, Object>>() {
+            @Override
+            public void onResponse(Call<Map<String, Object>> call, Response<Map<String, Object>> response) {
+                if (!response.isSuccessful()) {
+                    Log.e("DataRepo", "Shared API user sync failed: " + response.code());
+                    if (callback != null) callback.onFailure("Your account was created, but cloud sync is unavailable. Try signing in again.");
+                } else if (callback != null) {
+                    callback.onSuccess();
+                }
+            }
+
+            @Override
+            public void onFailure(Call<Map<String, Object>> call, Throwable throwable) {
+                Log.e("DataRepo", "Shared API user sync unavailable", throwable);
+                if (callback != null) callback.onFailure("Your account was created, but cloud sync is unavailable. Try signing in again.");
+            }
+        });
     }
 }

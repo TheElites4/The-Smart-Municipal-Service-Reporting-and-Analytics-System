@@ -5,17 +5,6 @@ export interface ServiceStatus {
   updated: string;
 }
 
-export const MUNICIPALITIES = [
-  { name: 'City of Johannesburg', province: 'Gauteng', phone: '0860 562 874', email: 'info@joburg.org.za' },
-  { name: 'City of Cape Town', province: 'Western Cape', phone: '0860 103 089', email: 'contact@capetown.gov.za' },
-  { name: 'eThekwini Municipality', province: 'KwaZulu-Natal', phone: '031 311 1111', email: 'info@durban.gov.za' },
-  { name: 'City of Tshwane', province: 'Gauteng', phone: '012 358 9999', email: 'info@tshwane.gov.za' },
-  { name: 'Ekurhuleni Metropolitan Municipality', province: 'Gauteng', phone: '0860 543 000', email: 'info@ekurhuleni.gov.za' },
-  { name: 'Nelson Mandela Bay', province: 'Eastern Cape', phone: '041 506 1911', email: 'info@mandelametro.gov.za' },
-  { name: 'Buffalo City', province: 'Eastern Cape', phone: '043 705 1000', email: 'info@buffalocity.gov.za' },
-  { name: 'Mangaung Metropolitan Municipality', province: 'Free State', phone: '051 405 8911', email: 'info@mangaung.co.za' },
-];
-
 export const SERVICE_STATUS: ServiceStatus[] = [
   { area: 'City of Johannesburg', water: 'normal', power: 'reduced', updated: '2 mins ago' },
   { area: 'City of Cape Town', water: 'outage', power: 'normal', updated: '5 mins ago' },

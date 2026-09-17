@@ -1,16 +1,19 @@
 package com.example.mzansiconnect;
 
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
+import android.view.View;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.navigation.NavController;
 import androidx.navigation.Navigation;
 import androidx.navigation.fragment.NavHostFragment;
-import androidx.navigation.ui.NavigationUI;
-import com.google.android.material.bottomnavigation.BottomNavigationView;
-import com.google.android.material.appbar.MaterialToolbar;
 import androidx.navigation.ui.AppBarConfiguration;
-import android.view.View;
-import androidx.annotation.NonNull;
+import androidx.navigation.ui.NavigationUI;
+import com.example.mzansiconnect.data.DataRepository;
+import com.google.android.material.appbar.MaterialToolbar;
+import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -50,6 +53,16 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
         }
+
+        // Request Notification permission on Android 13+ (Tiramisu)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 101);
+            }
+        }
+
+        // Initialize / Sync FCM token
+        DataRepository.getInstance(this).syncFcmTokenToFirebase();
     }
 
     @Override

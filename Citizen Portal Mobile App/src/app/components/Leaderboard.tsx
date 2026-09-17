@@ -1,18 +1,11 @@
 import { Trophy, Medal, Crown } from 'lucide-react';
 import { getHeroProfile } from '../utils/gamification';
 import { useTranslation } from '../utils/i18n';
+import { useEffect, useState } from 'react';
 
 interface LeaderboardProps {
   className?: string;
 }
-
-const MOCK_LEADERS = [
-  { name: 'Thabo M.', points: 1250, reports: 42, rank: 1 },
-  { name: 'Naledi S.', points: 980, reports: 35, rank: 2 },
-  { name: 'Sipho K.', points: 760, reports: 28, rank: 3 },
-  { name: 'Aisha P.', points: 540, reports: 20, rank: 4 },
-  { name: 'Lerato D.', points: 410, reports: 15, rank: 5 },
-];
 
 const RANK_COLORS = [
   { border: 'border-yellow-400', bg: 'bg-yellow-50', icon: Crown },
@@ -23,6 +16,8 @@ const RANK_COLORS = [
 export function Leaderboard({ className = '' }: LeaderboardProps) {
   const { t } = useTranslation();
   const currentUser = getHeroProfile();
+  const [leaders, setLeaders] = useState<any[]>([]);
+  useEffect(() => { fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8787'}/api/leaderboard`).then((response) => response.ok ? response.json() : []).then(setLeaders).catch(() => setLeaders([])); }, []);
 
   return (
     <div className={`bg-white border border-gray-200 rounded-xl shadow-sm ${className}`}>
@@ -32,7 +27,7 @@ export function Leaderboard({ className = '' }: LeaderboardProps) {
       </div>
 
       <div className="divide-y divide-gray-100">
-        {MOCK_LEADERS.map((leader) => {
+        {leaders.map((leader) => {
           const color = RANK_COLORS[leader.rank - 1] || RANK_COLORS[2];
           const RankIcon = color.icon;
           return (
@@ -61,6 +56,7 @@ export function Leaderboard({ className = '' }: LeaderboardProps) {
             </div>
           );
         })}
+        {!leaders.length && <p className="p-4 text-sm text-muted-foreground">No community reports yet.</p>}
       </div>
 
       {/* Current user */}

@@ -6,7 +6,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -14,9 +13,7 @@ import androidx.fragment.app.Fragment;
 import androidx.navigation.Navigation;
 import com.example.mzansiconnect.R;
 import com.example.mzansiconnect.data.DataRepository;
-import com.example.mzansiconnect.data.User;
 import com.example.mzansiconnect.data.FirebaseManager;
-import java.util.concurrent.Executors;
 
 public class LoginFragment extends Fragment {
 
@@ -33,8 +30,8 @@ public class LoginFragment extends Fragment {
         backBtn.setOnClickListener(v -> Navigation.findNavController(v).navigateUp());
 
         loginBtn.setOnClickListener(v -> {
-            String email = idEdit.getText().toString();
-            String pass = passEdit.getText().toString();
+            String email = idEdit.getText().toString().trim();
+            String pass = passEdit.getText().toString().trim();
 
             if (email.isEmpty() || pass.isEmpty()) {
                 Toast.makeText(getContext(), "Please enter email and password", Toast.LENGTH_SHORT).show();
@@ -49,12 +46,15 @@ public class LoginFragment extends Fragment {
             }
             FirebaseManager.getInstance().getAuth().signInWithEmailAndPassword(email, pass)
                     .addOnSuccessListener(result -> {
-                        if (isAdded()) Navigation.findNavController(v).navigate(R.id.action_login_to_mfa);
+                        if (isAdded()) {
+                            DataRepository.getInstance(requireContext()).syncFcmTokenToFirebase();
+                            Navigation.findNavController(v).navigate(R.id.action_login_to_mfa);
+                        }
                     })
                     .addOnFailureListener(error -> {
                         if (!isAdded()) return;
                         loginBtn.setEnabled(true);
-                        Toast.makeText(requireContext(), "Sign in failed. Check your email and password.", Toast.LENGTH_LONG).show();
+                        Toast.makeText(requireContext(), "Sign in failed: " + error.getLocalizedMessage(), Toast.LENGTH_LONG).show();
                     });
         });
 

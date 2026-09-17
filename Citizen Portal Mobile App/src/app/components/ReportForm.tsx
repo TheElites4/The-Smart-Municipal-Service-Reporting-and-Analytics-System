@@ -6,6 +6,7 @@ import { BackgroundWrapper } from './BackgroundWrapper';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { SOSButton } from './SOSButton';
 import { useTranslation, type Language } from '../utils/i18n';
+import { MUNICIPALITY_NAMES } from '../utils/rsaMunicipalities';
 import {
   FileText,
   MapPin,
@@ -132,30 +133,16 @@ const [errors, setErrors] = useState<Record<string, string>>({});
   };
 
   const handleAiDetection = (description: string) => {
-    setAiStatus('analyzing');
     setAiDetectedCategory('');
-
-    // Simulate AI processing delay
-    setTimeout(() => {
-      const lower = description.toLowerCase();
-
-      // Find matching category based on keywords
-      let detected: string | null = null;
-      for (const cat of ISSUE_CATEGORIES) {
-        if (cat.keywords.some((kw) => lower.includes(kw))) {
-          detected = cat.name;
-          break;
-        }
-      }
-
-      if (detected) {
-        setAiDetectedCategory(detected);
-        setFormData((prev) => ({ ...prev, category: detected }));
-        setAiStatus('detected');
-      } else {
-        setAiStatus('failed');
-      }
-    }, 1500);
+    const lower = description.toLowerCase();
+    const detected = ISSUE_CATEGORIES.find((cat) => cat.keywords.some((keyword) => lower.includes(keyword)))?.name;
+    if (detected) {
+      setAiDetectedCategory(detected);
+      setFormData((prev) => ({ ...prev, category: detected }));
+      setAiStatus('detected');
+    } else {
+      setAiStatus('failed');
+    }
   };
 
   const getMunicipality = async () => {
@@ -171,33 +158,17 @@ const [errors, setErrors] = useState<Record<string, string>>({});
       async (position) => {
         const { latitude, longitude } = position.coords;
 
-        const mockMunicipalities = [
-          { name: 'City of Johannesburg', lat: -26.2041, lon: 28.0473 },
-          { name: 'City of Cape Town', lat: -33.9249, lon: 18.4241 },
-          { name: 'eThekwini Municipality', lat: -29.8587, lon: 31.0218 },
-          { name: 'City of Tshwane', lat: -25.7479, lon: 28.2293 },
-          { name: 'Ekurhuleni Metropolitan Municipality', lat: -26.1714, lon: 28.2460 },
-        ];
-
-        let nearest = mockMunicipalities[0];
-        let minDistance = Infinity;
-
-        mockMunicipalities.forEach((muni) => {
-          const distance = Math.sqrt(
-            Math.pow(latitude - muni.lat, 2) + Math.pow(longitude - muni.lon, 2)
-          );
-          if (distance < minDistance) {
-            minDistance = distance;
-            nearest = muni;
-          }
-        });
-
-        setFormData({
-          ...formData,
-          municipality: nearest.name,
-          location: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
-        });
-        setLocating(false);
+        const coordinates = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+        try {
+          const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`, { headers: { Accept: 'application/json' } });
+          const place = response.ok ? await response.json() : null;
+          const municipality = place?.address?.municipality || place?.address?.city || place?.address?.town || '';
+          setFormData((previous) => ({ ...previous, municipality, location: coordinates }));
+        } catch {
+          setFormData((previous) => ({ ...previous, location: coordinates }));
+        } finally {
+          setLocating(false);
+        }
       },
       (error) => {
         console.error('Error getting location:', error);
@@ -241,7 +212,7 @@ const report = {
         </div>
 
         <div className="max-w-md mx-auto p-4 pb-8">
-          <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl p-6 border border-primary/20 mt-4">
+          <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl p-6 pb-8 border border-primary/20 mt-4 overflow-hidden">
             <form onSubmit={handleSubmit} className="space-y-5 mt-4">
               <div>
                 <Label>{t('selectCategory')}</Label>
@@ -284,7 +255,7 @@ const report = {
                     className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-[#1e5a7d]/10 text-[#1e5a7d] hover:bg-[#1e5a7d]/20 transition-colors"
                   >
                     <Sparkles className="w-3 h-3" />
-                    AI Detect
+                    Suggest category
                   </button>
                 </div>
                 <textarea
@@ -303,7 +274,7 @@ const report = {
                 {aiStatus === 'analyzing' && (
                   <div className="mt-2 flex items-center gap-2 p-3 rounded-lg bg-blue-50 border border-blue-200">
                     <Sparkles className="w-4 h-4 text-blue-500 animate-pulse" />
-                    <p className="text-sm text-blue-700">{t('aiAnalyzing')}</p>
+                    <p className="text-sm text-blue-700">Checking description keywords</p>
                   </div>
                 )}
                 {aiStatus === 'detected' && (
@@ -361,6 +332,9 @@ const report = {
                     📍 {formData.municipality}
                   </p>
                 )}
+                <label className="block mt-3 text-sm text-muted-foreground" htmlFor="municipality-confirm">Confirm municipality if the map result is incomplete</label>
+                <input id="municipality-confirm" list="rsa-municipalities" value={formData.municipality} onChange={(event) => setFormData((previous) => ({ ...previous, municipality: event.target.value }))} className="w-full px-4 py-3 rounded-lg bg-input-background border border-border" placeholder="Search South African municipality" />
+                <datalist id="rsa-municipalities">{MUNICIPALITY_NAMES.map((name) => <option key={name} value={name} />)}</datalist>
               </div>
 
               <div>
@@ -418,16 +392,16 @@ const report = {
                 )}
               </div>
 
-              <div className="flex gap-3 pt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-5 mt-2 border-t border-border/70">
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full"
+                  className="w-full min-w-0 min-h-12"
                   onClick={onCancel}
                 >
                   {t('cancel')}
                 </Button>
-                <Button type="submit" className="w-full bg-[#FFB612] text-black hover:bg-[#FFB612]/90">
+                <Button type="submit" className="w-full min-w-0 min-h-12 bg-[#f4b942] text-[#17383a] hover:bg-[#f4b942]/90 shadow-md">
                   {t('submitReport')}
                 </Button>
               </div>

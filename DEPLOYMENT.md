@@ -12,8 +12,19 @@ psql $env:DATABASE_URL -f backend/migrations/002_external_ref.sql
 psql $env:DATABASE_URL -f backend/seed.sql
 ```
 
-4. Start the API from `backend` with `npm install` and `npm start`.
+4. Set `AUTH_SECRET` to a long random value, then start the API from `backend` with `npm install` and `npm start`.
 5. Verify `GET http://localhost:8787/health` returns `database: connected`.
+
+The seeded dashboard accounts are:
+
+- Staff: `staff@example.gov.za` / `ChangeMeStaff!2026`
+- Admin: `admin@example.gov.za` / `ChangeMeAdmin!2026`
+
+Change both passwords immediately in the database or through your account-management process before production. Set a long random `AUTH_SECRET`; changing it invalidates existing dashboard sessions.
+
+The admin dashboard includes an **Add staff member** form. It calls `POST /api/staff`; the API requires an admin token, hashes the password with PostgreSQL `crypt()`, and saves the staff member's municipality and department. New staff can then sign in at the Staff Dashboard with the email/password created by the administrator.
+
+The staff and admin dashboards now require these credentials. Staff can update report status; admins can view workforce data and assign reports. The API rejects dashboard and realtime requests without a valid role token.
 
 ## Web clients
 

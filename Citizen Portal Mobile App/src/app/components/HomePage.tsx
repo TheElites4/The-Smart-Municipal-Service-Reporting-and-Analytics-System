@@ -36,7 +36,7 @@ export function HomePage({ onGetStarted, onLogin, language, onLanguageChange }: 
             {/* Desktop Menu */}
             <div className="hidden md:flex items-center gap-4">
               <LanguageSwitcher language={language} onLanguageChange={onLanguageChange} />
-              <Button onClick={onLogin} variant="outline" size="sm" className="border-[#1e5a7d] text-[#1e5a7d]">{t('login')}</Button>
+              <Button onClick={onLogin} variant="outline" size="sm" className="border-[#1e5a7d] text-[#1e5a7d]">{t('trackProgress')}</Button>
               <Button onClick={onGetStarted} size="sm" className="bg-[#FFB612] text-black hover:bg-[#FFB612]/90">{t('getStarted')}</Button>
             </div>
 
@@ -54,7 +54,7 @@ export function HomePage({ onGetStarted, onLogin, language, onLanguageChange }: 
             <div className="md:hidden py-4 space-y-2 border-t border-border">
               <div className="flex flex-col gap-2 mb-3">
                 <LanguageSwitcher language={language} onLanguageChange={onLanguageChange} />
-                <Button onClick={onLogin} variant="outline" className="w-full border-[#1e5a7d] text-[#1e5a7d]">{t('login')}</Button>
+                <Button onClick={onLogin} variant="outline" className="w-full border-[#1e5a7d] text-[#1e5a7d]">{t('trackProgress')}</Button>
                 <Button onClick={onGetStarted} className="w-full bg-[#FFB612] text-black hover:bg-[#FFB612]/90">{t('getStarted')}</Button>
               </div>
             </div>
@@ -94,7 +94,7 @@ export function HomePage({ onGetStarted, onLogin, language, onLanguageChange }: 
               <ChevronRight className="w-5 h-5 ml-2" />
             </Button>
             <Button onClick={onLogin} size="lg" variant="outline" className="bg-white/90 text-[#1e5a7d] hover:bg-white border-white shadow-lg">
-              {t('loginToPortal')}
+              {t('trackProgress')}
             </Button>
           </div>
         </div>

@@ -2,6 +2,8 @@ package com.example.mzansiconnect.ui.report;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
+import android.location.Address;
+import android.location.Geocoder;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -13,6 +15,8 @@ import android.widget.ImageButton;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
+import java.util.List;
+import java.util.Locale;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.app.ActivityCompat;
@@ -48,10 +52,7 @@ public class ReportSubmissionFragment extends Fragment {
         gpsBtn.setOnClickListener(v -> getGPSLocation());
         
         aiScanBtn.setOnClickListener(v -> {
-            Toast.makeText(getContext(), "AI Analyzing photo...", Toast.LENGTH_SHORT).show();
-            // Mock AI category selection
-            categorySpinner.setSelection(2); // Auto-selects "Roads"
-            Toast.makeText(getContext(), "AI Detected: Road Maintenance", Toast.LENGTH_LONG).show();
+            Toast.makeText(requireContext(), "Photo classification is not configured. Select a category manually.", Toast.LENGTH_LONG).show();
         });
 
         submitBtn.setOnClickListener(v -> {
@@ -95,11 +96,17 @@ public class ReportSubmissionFragment extends Fragment {
             if (location != null) {
                 String locStr = location.getLatitude() + ", " + location.getLongitude();
                 locationEdit.setText(locStr);
-                municipalityTv.setText("Nearest: City of Johannesburg");
+                try {
+                    List<Address> addresses = new Geocoder(requireContext(), Locale.getDefault()).getFromLocation(location.getLatitude(), location.getLongitude(), 1);
+                    String municipality = addresses != null && !addresses.isEmpty() ? addresses.get(0).getLocality() : null;
+                    municipalityTv.setText(municipality == null ? "Nearest: Municipality not resolved - confirm below" : "Nearest: " + municipality);
+                } catch (Exception error) {
+                    municipalityTv.setText("Nearest: Municipality not resolved - confirm below");
+                }
             } else {
-                Toast.makeText(getContext(), "GPS Signal weak. Using last known location.", Toast.LENGTH_SHORT).show();
-                locationEdit.setText("-26.2041, 28.0473");
-                municipalityTv.setText("Nearest: City of Johannesburg");
+                Toast.makeText(requireContext(), "GPS location unavailable. Try again outdoors.", Toast.LENGTH_LONG).show();
+                locationEdit.setText("");
+                municipalityTv.setText("Nearest: Municipality not resolved - confirm below");
             }
         });
     }

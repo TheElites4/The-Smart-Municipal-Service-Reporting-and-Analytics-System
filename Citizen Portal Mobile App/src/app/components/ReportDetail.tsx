@@ -24,27 +24,6 @@ interface ReportDetailProps {
   onLanguageChange: (lang: Language) => void;
 }
 
-const MOCK_TIMELINE = [
-  {
-    status: 'submitted',
-    date: '2026-05-11',
-    time: '09:30',
-    description: 'reportSubmittedBy',
-  },
-  {
-    status: 'reviewed',
-    date: '2026-05-11',
-    time: '14:15',
-    description: 'reportAssigned',
-  },
-  {
-    status: 'in-progress',
-    date: '2026-05-12',
-    time: '08:00',
-    description: 'technicianDispatched',
-  },
-];
-
 export function ReportDetail({ report, onBack, language, onLanguageChange }: ReportDetailProps) {
   const { t } = useTranslation();
 
@@ -55,6 +34,11 @@ export function ReportDetail({ report, onBack, language, onLanguageChange }: Rep
 
   const [timeLeft, setTimeLeft] = useState<string>('');
   const [isOverdue, setIsOverdue] = useState(false);
+  const [timeline, setTimeline] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8787'}/api/reports/${encodeURIComponent(report.databaseId || report.id)}/events`).then((response) => response.ok ? response.json() : []).then(setTimeline).catch(() => setTimeline([]));
+  }, [report.databaseId, report.id, report.status]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -254,29 +238,29 @@ export function ReportDetail({ report, onBack, language, onLanguageChange }: Rep
             <h3 className="mb-4">{t('trackProgress')}</h3>
 
             <div className="space-y-4">
-              {MOCK_TIMELINE.map((event, index) => (
+              {timeline.map((event, index) => (
                 <div key={index} className="flex gap-3">
                   <div className="flex flex-col items-center">
                     <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
                       <CheckCircle className="w-4 h-4 text-primary" />
                     </div>
-                    {index < MOCK_TIMELINE.length - 1 && (
+                    {index < timeline.length - 1 && (
                       <div className="w-0.5 h-full bg-border mt-1 flex-1 min-h-[24px]" />
                     )}
                   </div>
 
                   <div className="flex-1 pb-4">
-                    <p className="font-medium text-foreground">{t(event.description as 'reportSubmittedBy')}</p>
+                    <p className="font-medium text-foreground">{event.note || event.to_status.replaceAll('_', ' ')}</p>
                     <p className="text-sm text-muted-foreground">
-                      {new Date(event.date).toLocaleDateString('en-ZA', {
+                      {new Date(event.created_at).toLocaleDateString('en-ZA', {
                         month: 'short',
                         day: 'numeric',
-                      })}{' '}
-                      at {event.time}
+                      })}{' '}at {new Date(event.created_at).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
                 </div>
               ))}
+              {!timeline.length && <p className="text-sm text-muted-foreground">No status events recorded yet.</p>}
 
               {report.status !== 'resolved' && (
                 <div className="flex gap-3 opacity-50">

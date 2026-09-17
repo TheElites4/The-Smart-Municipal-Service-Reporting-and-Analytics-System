@@ -25,8 +25,8 @@ public class HomeFragment extends Fragment {
         Button login = root.findViewById(R.id.btn_home_login);
         View sosCard = root.findViewById(R.id.card_sos);
 
-        getStarted.setOnClickListener(v -> Navigation.findNavController(v).navigate(R.id.navigation_registration));
-        login.setOnClickListener(v -> Navigation.findNavController(v).navigate(R.id.navigation_login));
+        getStarted.setOnClickListener(v -> Navigation.findNavController(v).navigate(R.id.navigation_dashboard));
+        login.setVisibility(View.GONE);
 
         sosCard.setOnClickListener(v -> {
             Toast.makeText(getContext(), "Connecting to Emergency Services...", Toast.LENGTH_SHORT).show();

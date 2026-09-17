@@ -3,6 +3,7 @@ package com.example.mzansiconnect.data;
 import android.content.Context;
 import android.util.Log;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.SetOptions;
 import java.util.HashMap;
 import java.util.Map;
 import retrofit2.Call;
@@ -10,11 +11,12 @@ import retrofit2.Callback;
 import retrofit2.Response;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
+import java.util.UUID;
 
 /**
  * PRODUCTION READY - TRIPLE DATABASE REPOSITORY
- * This class orchestrates data between Local SQL (Room) and Cloud sources.
- * Firebase logic is abstracted to FirebaseManager for cleaner code.
+ * This class orchestrates data between Local SQL (Room) and Cloud sources
+ * (Firebase Auth, Firestore, Realtime Database, Cloud Messaging).
  */
 public class DataRepository {
     public interface RegistrationCallback {
@@ -22,10 +24,12 @@ public class DataRepository {
         void onFailure(String message);
     }
     private static DataRepository instance;
+    private final Context context;
     private final AppDatabase sqlDb;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
     private DataRepository(Context context) {
+        this.context = context.getApplicationContext();
         sqlDb = AppDatabase.getInstance(context);
     }
 
@@ -41,25 +45,27 @@ public class DataRepository {
     }
 
     public void registerUser(User user, String password, RegistrationCallback callback) {
-        // 1. SAVE TO LOCAL SQL (Works Real-Life)
+        // 1. SAVE TO LOCAL SQL
         executor.execute(() -> sqlDb.appDao().registerUser(user));
 
-        // 2. SYNC TO FIREBASE (Handled safely if configured)
+        // 2. SYNC TO FIREBASE AUTH & FIRESTORE
         FirebaseManager fm = FirebaseManager.getInstance();
         if (fm.getAuth() != null) {
             fm.getAuth().createUserWithEmailAndPassword(user.email, password)
                     .addOnSuccessListener(authResult -> {
                         if (authResult.getUser() != null) {
+                            String uid = authResult.getUser().getUid();
                             if (fm.getFirestore() != null) {
                                 fm.getFirestore().collection("users")
-                                        .document(authResult.getUser().getUid()).set(user);
+                                        .document(uid).set(user);
                             }
-                            syncUserToSharedApi(user, authResult.getUser().getUid(), callback);
+                            syncFcmTokenToFirebase();
+                            syncUserToSharedApi(user, uid, callback);
                         }
                     })
                     .addOnFailureListener(e -> {
                         Log.e("DataRepo", "Firebase Auth Failed: " + e.getMessage());
-                        if (callback != null) callback.onFailure("Registration failed. Please check your details and try again.");
+                        if (callback != null) callback.onFailure("Registration failed: " + e.getLocalizedMessage());
                     });
         } else if (callback != null) {
             callback.onFailure("Authentication service is unavailable.");
@@ -70,7 +76,7 @@ public class DataRepository {
         // 1. SAVE TO LOCAL SQL
         executor.execute(() -> sqlDb.appDao().submitReport(report));
 
-        // 2. SYNC TO CLOUD FEED (Firebase Realtime & Firestore)
+        // 2. SYNC TO CLOUD FEED (Firebase Realtime Database & Firestore)
         FirebaseManager fm = FirebaseManager.getInstance();
         if (fm.getFirestore() != null) {
             fm.getFirestore().collection("reports").add(report);
@@ -79,10 +85,15 @@ public class DataRepository {
             fm.getDatabase().getReference("live_feed").push().setValue(report);
         }
 
-        FirebaseUser firebaseUser = fm.getAuth() == null ? null : fm.getAuth().getCurrentUser();
-        if (firebaseUser != null) {
+        FirebaseUser firebaseUser = fm.getCurrentUser();
+        {
             Map<String, Object> payload = new HashMap<>();
-            payload.put("externalRef", firebaseUser.getUid());
+            String anonymousRef = context.getSharedPreferences("mzansi_client", Context.MODE_PRIVATE).getString("externalRef", null);
+            if (anonymousRef == null) {
+                anonymousRef = UUID.randomUUID().toString();
+                context.getSharedPreferences("mzansi_client", Context.MODE_PRIVATE).edit().putString("externalRef", anonymousRef).apply();
+            }
+            payload.put("externalRef", firebaseUser == null ? anonymousRef : firebaseUser.getUid());
             payload.put("category", report.category);
             payload.put("description", report.description);
             payload.put("location", report.location);
@@ -101,6 +112,34 @@ public class DataRepository {
             });
         }
         Log.d("MzansiReport", "Report saved to Room and queued for Firebase plus shared API synchronization.");
+    }
+
+    public void syncFcmTokenToFirebase() {
+        FirebaseManager fm = FirebaseManager.getInstance();
+        FirebaseUser currentUser = fm.getCurrentUser();
+        if (currentUser == null) return;
+
+        fm.fetchFcmToken(new FirebaseManager.FcmTokenCallback() {
+            @Override
+            public void onTokenReceived(String token) {
+                String uid = currentUser.getUid();
+                if (fm.getFirestore() != null) {
+                    Map<String, Object> data = new HashMap<>();
+                    data.put("fcmToken", token);
+                    data.put("lastUpdated", System.currentTimeMillis());
+                    fm.getFirestore().collection("users").document(uid)
+                            .set(data, SetOptions.merge());
+                }
+                if (fm.getDatabase() != null) {
+                    fm.getDatabase().getReference("user_tokens").child(uid).setValue(token);
+                }
+            }
+
+            @Override
+            public void onError(Exception e) {
+                Log.e("DataRepo", "Failed to sync FCM token: " + e.getMessage());
+            }
+        });
     }
 
     private void syncUserToSharedApi(User user, String externalRef, RegistrationCallback callback) {

@@ -27,69 +27,79 @@ type Screen =
 const toCitizenReport = (report: any) => ({
   ...report,
   id: report.id || report.public_reference,
+  databaseId: report.databaseId || report.id,
   date: report.date || report.created_at,
   status: report.status?.replace('_', '-') || 'submitted',
 });
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<Screen>('home');
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentScreen, setCurrentScreen] = useState<Screen>('dashboard');
+  const [isAuthenticated, setIsAuthenticated] = useState(true);
   const [reports, setReports] = useState<any[]>([]);
   const [selectedReport, setSelectedReport] = useState<any>(null);
   const { language, setLanguage } = useTranslation();
 
   useEffect(() => {
-    const user = localStorage.getItem('user');
-    if (user) {
-      setIsAuthenticated(true);
-      setCurrentScreen('dashboard');
-    } else {
-      setCurrentScreen('home');
+    const api = import.meta.env.VITE_API_URL || 'http://localhost:8787';
+    const updateLocation = (position: GeolocationPosition) => localStorage.setItem('clientLocation', JSON.stringify({ latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy, capturedAt: new Date().toISOString() }));
+    const locationWatch = navigator.geolocation?.watchPosition(updateLocation, () => undefined, { enableHighAccuracy: true, maximumAge: 30000, timeout: 15000 });
+    let user = localStorage.getItem('user');
+    if (!user) {
+      const externalRef = crypto.randomUUID();
+      user = JSON.stringify({ id: externalRef, externalRef, fullName: 'Anonymous Citizen', email: '' });
+      localStorage.setItem('user', user);
+      fetch(`${api}/api/users/anonymous`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ externalRef }) })
+        .then((response) => response.ok ? response.json() : null)
+        .then((identity) => { if (identity?.id) localStorage.setItem('user', JSON.stringify({ ...JSON.parse(user as string), id: identity.id })); })
+        .catch(() => undefined);
     }
 
     const savedReports = localStorage.getItem('reports');
     if (savedReports) setReports(JSON.parse(savedReports));
     const citizen = user ? JSON.parse(user) : {};
-    if (citizen.id) {
-      fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8787'}/api/reports?citizenId=${encodeURIComponent(citizen.id)}`)
+    const connectClient = (citizenId: string) => {
+      fetch(`${api}/api/reports?citizenId=${encodeURIComponent(citizenId)}`)
         .then((response) => response.ok ? response.json() : null)
         .then((remoteReports) => { if (remoteReports) setReports(remoteReports.map(toCitizenReport)); })
         .catch(() => undefined);
-    }
-    if (citizen.id && window.EventSource) {
-      const events = new EventSource(`${import.meta.env.VITE_API_URL || 'http://localhost:8787'}/api/events`);
-      const refreshReports = () => fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8787'}/api/reports?citizenId=${encodeURIComponent(citizen.id)}`)
+      if (!window.EventSource) return undefined;
+      const events = new EventSource(`${api}/api/events?citizenId=${encodeURIComponent(citizenId)}`);
+      const refreshReports = () => fetch(`${api}/api/reports?citizenId=${encodeURIComponent(citizenId)}`)
         .then((response) => response.ok ? response.json() : null)
         .then((remoteReports) => { if (remoteReports) setReports(remoteReports.map(toCitizenReport)); })
         .catch(() => undefined);
       events.addEventListener('report.updated', refreshReports);
       events.addEventListener('report.created', refreshReports);
       return () => events.close();
+    };
+    if (citizen.id && citizen.id !== citizen.externalRef) return connectClient(citizen.id);
+    if (citizen.externalRef) {
+      fetch(`${api}/api/users/anonymous`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ externalRef: citizen.externalRef }) })
+        .then((response) => response.ok ? response.json() : null)
+        .then((identity) => { if (identity?.id) { const next = { ...citizen, id: identity.id }; localStorage.setItem('user', JSON.stringify(next)); connectClient(identity.id); } })
+        .catch(() => undefined);
     }
+    return () => { if (locationWatch !== undefined) navigator.geolocation.clearWatch(locationWatch); };
   }, []);
 
-  const handleRegistrationSuccess = () => {
-    setCurrentScreen('mfa');
-  };
-
-  const handleLoginSuccess = () => {
-    setCurrentScreen('mfa');
-  };
-
-  const handleMFASuccess = () => {
-    setIsAuthenticated(true);
-    setCurrentScreen('dashboard');
-  };
-
   const handleLogout = () => {
-    localStorage.removeItem('user');
-    setIsAuthenticated(false);
     setCurrentScreen('home');
-    setReports([]);
   };
 
 const handleSubmitReport = async (report: any) => {
     const citizen = JSON.parse(localStorage.getItem('user') || '{}');
+    if (citizen.id === citizen.externalRef) {
+      try {
+        const identityResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8787'}/api/users/anonymous`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ externalRef: citizen.externalRef }) });
+        if (identityResponse.ok) {
+          const identity = await identityResponse.json();
+          citizen.id = identity.id;
+          localStorage.setItem('user', JSON.stringify(citizen));
+        }
+      } catch {
+        // Keep the local offline report if the API is unavailable.
+      }
+    }
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8787'}/api/reports`, {
         method: 'POST',
@@ -139,54 +149,6 @@ confetti({ particleCount: 150, spread: 80, origin: { x: 0.5, y: 0.6 } });
     setLanguage(lang);
   };
 
-  if (currentScreen === 'home') {
-    return (
-      <HomePage
-        onGetStarted={() => setCurrentScreen('registration')}
-        onLogin={() => setCurrentScreen('login')}
-        language={language}
-        onLanguageChange={handleLanguageChange}
-      />
-    );
-  }
-
-  if (!isAuthenticated) {
-    if (currentScreen === 'registration') {
-      return (
-        <Registration
-          onSuccess={handleRegistrationSuccess}
-          onSwitchToLogin={() => setCurrentScreen('login')}
-          onBackHome={() => setCurrentScreen('home')}
-          language={language}
-          onLanguageChange={handleLanguageChange}
-        />
-      );
-    }
-
-    if (currentScreen === 'login') {
-      return (
-        <Login
-          onSuccess={handleLoginSuccess}
-          onSwitchToRegister={() => setCurrentScreen('registration')}
-          onBackHome={() => setCurrentScreen('home')}
-          language={language}
-          onLanguageChange={handleLanguageChange}
-        />
-      );
-    }
-
-    if (currentScreen === 'mfa') {
-      return (
-        <MFAVerification
-          onSuccess={handleMFASuccess}
-          onBack={() => setCurrentScreen('login')}
-          language={language}
-          onLanguageChange={handleLanguageChange}
-        />
-      );
-    }
-  }
-
   if (currentScreen === 'dashboard') {
     return (
       <Dashboard
@@ -195,6 +157,17 @@ confetti({ particleCount: 150, spread: 80, origin: { x: 0.5, y: 0.6 } });
         onLogout={handleLogout}
         onCommunityFeed={() => setCurrentScreen('community')}
         reports={reports}
+        language={language}
+        onLanguageChange={handleLanguageChange}
+      />
+    );
+  }
+
+  if (currentScreen === 'home') {
+    return (
+      <HomePage
+        onGetStarted={() => setCurrentScreen('new-report')}
+        onLogin={() => setCurrentScreen('dashboard')}
         language={language}
         onLanguageChange={handleLanguageChange}
       />

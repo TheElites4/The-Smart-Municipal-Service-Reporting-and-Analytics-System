@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MzansiReport</string>
+    <string name="slogan">Slimmunisipale Dienste</string>
+    <string name="mission">Bemagtig Suid-Afrikaanse gemeenskappe deur deursigtige, doeltreffende en aanspreeklike munisipale dienslewering.</string>
+
+    <string name="welcome">Welkom</string>
+    <string name="sos_title">Noodhulp</string>
+    <string name="sos_desc">Tik vir onmiddellike hulp</string>
+    <string name="how_it_works">Hoe Dit Werk</string>
+
+    <string name="wc_tagline">Slimmunisipale Dienste</string>
+    <string name="wc_get_started">Begin</string>
+    <string name="wc_track_progress">Dop Vordering</string>
+    <string name="wc_login">Teken in</string>
+    <string name="wc_logout">Teken uit</string>
+    <string name="wc_new_report">Nuwe Verslag</string>
+    <string name="wc_my_reports">My Verslae</string>
+    <string name="wc_total_reports">Totale Verslae</string>
+    <string name="wc_in_progress">Aan die gang</string>
+    <string name="wc_resolved">Opgelos</string>
+    <string name="wc_submit_report">Dien Verslag In</string>
+    <string name="wc_community_feed">Gemeenskapsvoer</string>
+    <string name="wc_me_too">Ek ook</string>
+    <string name="wc_emergency_sos">Nood-SOS</string>
+    <string name="wc_no_reports">Nog geen verslae nie</string>
+    <string name="wc_submit_first">Dien jou eerste verslag in om te begin</string>
+    <string name="wc_view_details">Bekyk Besonderhede</string>
+    <string name="wc_submit_report_title">Dien Nuwe Verslag In</string>
+    <string name="wc_report_details_title">Verslagbesonderhede</string>
+    <string name="wc_report_tracking">MzansiReport Nasporing</string>
+    <string name="wc_back_to_dashboard">Terug na Dashboard</string>
+    <string name="wc_select_category">Kies Kategorie</string>
+    <string name="wc_description">Beskrywing</string>
+    <string name="wc_location">Ligging</string>
+    <string name="wc_urgency">Dringendheid</string>
+    <string name="wc_urgency_low">Laag</string>
+    <string name="wc_urgency_medium">Medium</string>
+    <string name="wc_urgency_high">Hoog</string>
+    <string name="wc_cancel">Kanselleer</string>
+    <string name="wc_category_water">Water &amp; Sanitasie</string>
+    <string name="wc_category_electricity">Elektrisiteit</string>
+    <string name="wc_category_roads">Paaie &amp; Slaggate</string>
+    <string name="wc_category_streetlights">Straatbeligting</string>
+    <string name="wc_category_waste">Afvalbestuur</string>
+    <string name="wc_category_parks">Parke &amp; Ontspanning</string>
+    <string name="wc_category_other">Ander</string>
+    <string name="wc_police">Polisie</string>
+    <string name="wc_fire">Brand</string>
+    <string name="wc_medical">Medies</string>
+    <string name="wc_load_shedding_status">Beurtkrag</string>
+    <string name="wc_hero_points">Gemeenskapsheld Punte</string>
+    <string name="wc_hero_level_bronze">Brons Held</string>
+    <string name="wc_hero_level_silver">Silwer Held</string>
+    <string name="wc_hero_level_gold">Goue Held</string>
+    <string name="wc_hero_level_platinum">Platinum Held</string>
+    <string name="wc_hero_level_diamond">Diamant Held</string>
+    <string name="assistant_title">Burger Assistent</string>
+    <string name="assistant_subtitle">KI-hulp</string>
+    <string name="assistant_open">Assistent</string>
+    <string name="assistant_placeholder">Vra my enigiets...</string>
+    <string name="assistant_welcome">Goeie dag! ✋ Ek is jou MzansiReport assistent. Hoe kan ek jou vandag help?</string>
+</resources>

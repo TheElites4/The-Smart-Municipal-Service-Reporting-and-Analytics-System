@@ -14,6 +14,8 @@ import androidx.navigation.ui.NavigationUI;
 import com.example.mzansiconnect.data.DataRepository;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
+import java.util.ArrayList;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -33,7 +35,7 @@ public class MainActivity extends AppCompatActivity {
             
             AppBarConfiguration appBarConfiguration = new AppBarConfiguration.Builder(
                     R.id.navigation_home, R.id.navigation_dashboard, R.id.navigation_service_status, 
-                    R.id.navigation_analytics, R.id.navigation_leaderboard, R.id.navigation_profile)
+                    R.id.navigation_chatbot, R.id.navigation_analytics, R.id.navigation_leaderboard, R.id.navigation_profile)
                     .build();
             NavigationUI.setupActionBarWithNavController(this, navController, appBarConfiguration);
             NavigationUI.setupWithNavController(navView, navController);
@@ -54,15 +56,31 @@ public class MainActivity extends AppCompatActivity {
             });
         }
 
-        // Request Notification permission on Android 13+ (Tiramisu)
+        // Request Location & Notification permissions immediately on app launch
+        List<String> permissions = new ArrayList<>();
+        if (checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            permissions.add(android.Manifest.permission.ACCESS_FINE_LOCATION);
+        }
+        if (checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            permissions.add(android.Manifest.permission.ACCESS_COARSE_LOCATION);
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 101);
+                permissions.add(android.Manifest.permission.POST_NOTIFICATIONS);
             }
+        }
+        if (!permissions.isEmpty()) {
+            requestPermissions(permissions.toArray(new String[0]), 200);
         }
 
         // Initialize / Sync FCM token
         DataRepository.getInstance(this).syncFcmTokenToFirebase();
+    }
+
+    private NavController getNavController() {
+        NavHostFragment navHostFragment = (NavHostFragment) getSupportFragmentManager()
+                .findFragmentById(R.id.nav_host_fragment);
+        return navHostFragment != null ? navHostFragment.getNavController() : null;
     }
 
     @Override
@@ -74,16 +92,36 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public boolean onOptionsItemSelected(@NonNull android.view.MenuItem item) {
         if (item.getItemId() == R.id.action_notifications) {
-            NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment);
-            navController.navigate(R.id.navigation_notifications);
+            NavController navController = getNavController();
+            if (navController != null) {
+                navController.navigate(R.id.navigation_notifications);
+            }
+            return true;
+        } else if (item.getItemId() == R.id.action_language) {
+            showLanguageDialog();
             return true;
         }
         return super.onOptionsItemSelected(item);
     }
 
+    private void showLanguageDialog() {
+        String[] languages = {"🇬🇧 English", "🇿🇦 isiZulu", "🇿🇦 isiXhosa", "🇿🇦 Afrikaans"};
+        String[] codes = {"en", "zu", "xh", "af"};
+
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle("Select Language / Khetha Ulimi")
+                .setItems(languages, (dialog, which) -> {
+                    String selectedCode = codes[which];
+                    androidx.appcompat.app.AppCompatDelegate.setApplicationLocales(
+                            androidx.core.os.LocaleListCompat.forLanguageTags(selectedCode)
+                    );
+                })
+                .show();
+    }
+
     @Override
     public boolean onSupportNavigateUp() {
-        NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment);
-        return navController.navigateUp() || super.onSupportNavigateUp();
+        NavController navController = getNavController();
+        return (navController != null && navController.navigateUp()) || super.onSupportNavigateUp();
     }
 }

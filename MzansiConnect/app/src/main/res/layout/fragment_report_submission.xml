@@ -1,170 +1,364 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Mirrors web Citizen Portal ReportForm.tsx -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/portal_background">
+    android:background="@color/web_bg"
+    android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="24dp">
+        android:orientation="vertical">
 
-        <androidx.cardview.widget.CardView
+        <!-- Header bar: gradient from-[#1e5a7d] to-[#4a8f8f] -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:cardCornerRadius="24dp"
-            app:cardElevation="0dp"
-            android:backgroundTint="@android:color/transparent">
+            android:background="@drawable/web_form_header_gradient"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="16dp">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_services"
+                app:tint="@color/white" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/wc_submit_report_title"
+                    android:textColor="@color/white"
+                    android:textSize="17sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/wc_tagline"
+                    android:textColor="#CCFFFFFF"
+                    android:textSize="11sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <!-- Category selection (colored grid) -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/wc_select_category"
+                android:textColor="@color/web_text"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/category_error"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/wc_please_select_category"
+                android:textColor="@color/urgency_high"
+                android:textSize="12sp"
+                android:visibility="gone" />
+
+            <GridLayout
+                android:id="@+id/category_grid"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:columnCount="2"
+                android:rowCount="4" />
+
+            <!-- Description + AI suggest -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/wc_description"
+                    android:textColor="@color/web_text"
+                    android:textStyle="bold" />
+
+                <Button
+                    android:id="@+id/btn_ai_suggest"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/web_outline_button"
+                    android:minWidth="0dp"
+                    android:paddingHorizontal="10dp"
+                    android:text="@string/wc_suggest_category"
+                    android:textAllCaps="false"
+                    android:textColor="@color/web_primary"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <EditText
+                android:id="@+id/edit_desc"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/web_input"
+                android:gravity="top"
+                android:hint="Provide detailed information about the issue..."
+                android:inputType="textMultiLine"
+                android:lines="5"
+                android:padding="14dp"
+                android:textColor="@color/web_text"
+                android:textColorHint="@color/web_text_muted" />
+
+            <TextView
+                android:id="@+id/ai_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:padding="10dp"
+                android:textSize="12sp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/description_error"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/urgency_high"
+                android:textSize="12sp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/description_count"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="0 @string/wc_characters"
+                android:textColor="@color/web_text_muted"
+                android:textSize="11sp" />
+
+            <!-- Location -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:text="@string/wc_location"
+                android:textColor="@color/web_text"
+                android:textStyle="bold" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="@drawable/glass_card"
-                android:orientation="vertical"
-                android:padding="24dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Submit Service Report"
-                    android:textSize="22sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/white" />
-
-                <!-- AI SCAN SECTION -->
-                <androidx.cardview.widget.CardView
-                    android:id="@+id/btn_ai_scan"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="20dp"
-                    app:cardCornerRadius="12dp"
-                    app:cardElevation="0dp"
-                    android:backgroundTint="@color/portal_badge_blue">
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:padding="12dp"
-                        android:gravity="center"
-                        android:orientation="horizontal">
-                        <ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/ic_security_small" app:tint="@color/white" />
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="12dp" android:text="AI CATEGORY SCAN" android:textColor="@color/white" android:textStyle="bold" android:textSize="13sp" />
-                    </LinearLayout>
-                </androidx.cardview.widget.CardView>
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="20dp"
-                    android:text="Issue Category"
-                    android:textColor="@color/portal_text_secondary"
-                    android:textStyle="bold" />
-
-                <Spinner
-                    android:id="@+id/spinner_category"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="8dp"
-                    android:background="@drawable/glass_card"
-                    android:backgroundTint="@color/portal_input_bg"
-                    android:entries="@array/report_categories" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="20dp"
-                    android:text="Detailed Description"
-                    android:textColor="@color/portal_text_secondary"
-                    android:textStyle="bold" />
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
 
                 <EditText
-                    android:id="@+id/edit_desc"
-                    android:layout_width="match_parent"
+                    android:id="@+id/edit_location"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/web_input"
+                    android:hint="@string/wc_street_address"
+                    android:paddingHorizontal="14dp"
+                    android:textColor="@color/web_text"
+                    android:textColorHint="@color/web_text_muted" />
+
+                <ImageButton
+                    android:id="@+id/btn_gps"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/web_outline_button"
+                    android:contentDescription="@string/wc_location"
+                    android:src="@drawable/ic_traffic"
+                    app:tint="@color/web_primary" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/location_error"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/wc_location_required"
+                android:textColor="@color/urgency_high"
+                android:textSize="12sp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tv_municipality_detected"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:textColor="@color/web_primary"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="@string/wc_confirm_municipality"
+                android:textColor="@color/web_text_muted"
+                android:textSize="12sp" />
+
+            <AutoCompleteTextView
+                android:id="@+id/edit_municipality"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/web_input"
+                android:completionThreshold="1"
+                android:hint="@string/wc_search_municipality"
+                android:inputType="text"
+                android:paddingHorizontal="14dp"
+                android:textColor="@color/web_text"
+                android:textColorHint="@color/web_text_muted" />
+
+            <!-- Urgency -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:text="@string/wc_urgency"
+                android:textColor="@color/web_text"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btn_urgency_low"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:background="@drawable/glass_card"
-                    android:backgroundTint="@color/portal_input_bg"
-                    android:gravity="top"
-                    android:hint="Describe the issue in detail..."
-                    android:inputType="textMultiLine"
-                    android:lines="4"
-                    android:padding="16dp"
-                    android:textColor="@color/white"
-                    android:textColorHint="@color/portal_text_secondary" />
+                    android:layout_marginEnd="4dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/web_outline_button"
+                    android:text="@string/wc_urgency_low"
+                    android:textAllCaps="false"
+                    android:textColor="@color/web_primary" />
+
+                <Button
+                    android:id="@+id/btn_urgency_medium"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="4dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/web_hero_button"
+                    android:text="@string/wc_urgency_medium"
+                    android:textAllCaps="false"
+                    android:textColor="@color/black" />
+
+                <Button
+                    android:id="@+id/btn_urgency_high"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/web_outline_button"
+                    android:text="@string/wc_urgency_high"
+                    android:textAllCaps="false"
+                    android:textColor="@color/web_primary" />
+            </LinearLayout>
+
+            <!-- Photos -->
+            <LinearLayout
+                android:id="@+id/photo_dropzone"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:background="@drawable/web_photo_dropzone"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <ImageView
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:src="@drawable/ic_upload"
+                    app:tint="@color/web_text_muted" />
 
                 <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="20dp"
-                    android:text="Location (Auto-GPS)"
-                    android:textColor="@color/portal_text_secondary"
-                    android:textStyle="bold" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:orientation="horizontal">
-
-                    <EditText
-                        android:id="@+id/edit_location"
-                        android:layout_width="0dp"
-                        android:layout_height="48dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/glass_card"
-                        android:backgroundTint="@color/portal_input_bg"
-                        android:hint="Coordinates or Address"
-                        android:paddingHorizontal="16dp"
-                        android:textColor="@color/white"
-                        android:textColorHint="@color/portal_text_secondary" />
-
-                    <ImageButton
-                        android:id="@+id/btn_gps"
-                        android:layout_width="48dp"
-                        android:layout_height="48dp"
-                        android:layout_marginStart="8dp"
-                        android:src="@drawable/ic_home"
-                        android:background="@drawable/glass_card"
-                        android:backgroundTint="@color/portal_badge_green"
-                        app:tint="@color/white" />
-                </LinearLayout>
-
-                <TextView
-                    android:id="@+id/tv_municipality"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
-                    android:text="Nearest: Detecting municipality..."
-                    android:textColor="@color/accent"
-                    android:textSize="12sp"
-                    android:textStyle="bold" />
+                    android:text="@string/wc_upload_photos"
+                    android:textColor="@color/web_text_muted"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/wc_photo_limit"
+                    android:textColor="@color/web_text_muted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/photo_preview_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal" />
+
+            <!-- Actions -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btn_cancel_report"
+                    android:layout_width="0dp"
+                    android:layout_height="52dp"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/web_outline_button"
+                    android:text="@string/wc_cancel"
+                    android:textAllCaps="false"
+                    android:textColor="@color/web_primary" />
 
                 <Button
                     android:id="@+id/btn_submit_report"
-                    android:layout_width="match_parent"
-                    android:layout_height="54dp"
-                    android:layout_marginTop="32dp"
-                    android:backgroundTint="@color/portal_button_orange"
-                    android:text="Submit to Municipal Portal"
+                    android:layout_width="0dp"
+                    android:layout_height="52dp"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/web_hero_button"
+                    android:text="@string/wc_submit_report"
                     android:textAllCaps="false"
-                    android:textColor="@color/white"
-                    android:textStyle="bold"
-                    app:cornerRadius="12dp" />
-
-                <CheckBox
-                    android:id="@+id/check_safety"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:text="BROADCAST AS SAFETY ALERT"
-                    android:textColor="@color/red"
-                    android:textStyle="bold"
-                    android:textSize="11sp"
-                    android:buttonTint="@color/red" />
-
+                    android:textColor="@color/black"
+                    android:textStyle="bold" />
             </LinearLayout>
-        </androidx.cardview.widget.CardView>
 
+            <CheckBox
+                android:id="@+id/check_safety"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:buttonTint="@color/urgency_high"
+                android:text="BROADCAST AS SAFETY ALERT"
+                android:textColor="@color/urgency_high"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+        </LinearLayout>
     </LinearLayout>
 </ScrollView>

@@ -9,6 +9,10 @@
         android:icon="@drawable/ic_services"
         android:title="Status" />
     <item
+        android:id="@+id/navigation_chatbot"
+        android:icon="@drawable/ic_bot"
+        android:title="Assistant" />
+    <item
         android:id="@+id/navigation_analytics"
         android:icon="@drawable/ic_notifications"
         android:title="Insights" />

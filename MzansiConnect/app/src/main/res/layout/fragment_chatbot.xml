@@ -1,72 +1,163 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Mirrors web CitizenAssistant.tsx chat window -->
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/portal_background">
+    android:background="@color/web_bg">
 
-    <androidx.cardview.widget.CardView
+    <!-- Header: gradient from-[#173d3c] to-[#176b5b] -->
+    <LinearLayout
+        android:id="@+id/assistant_header"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_margin="16dp"
-        app:cardCornerRadius="24dp"
-        app:cardElevation="0dp"
-        android:backgroundTint="@android:color/transparent"
-        app:layout_constraintBottom_toTopOf="@+id/input_area"
+        android:layout_height="wrap_content"
+        android:background="@drawable/web_nav_gradient"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="16dp"
         app:layout_constraintTop_toTopOf="parent">
 
+        <ImageView
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="@drawable/circle_bg"
+            android:padding="8dp"
+            android:src="@drawable/ic_security_small"
+            app:tint="@color/white" />
+
         <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="@drawable/glass_card"
-            android:orientation="vertical"
-            android:padding="16dp">
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Citizen AI Assistant"
-                android:textColor="@color/accent"
+                android:text="@string/wc_assistant_title"
+                android:textColor="@color/white"
+                android:textSize="16sp"
                 android:textStyle="bold" />
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/chat_recycler"
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1"
-                android:layout_marginTop="12dp" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/wc_assistant_subtitle"
+                android:textColor="#CCFFFFFF"
+                android:textSize="11sp" />
         </LinearLayout>
-    </androidx.cardview.widget.CardView>
+    </LinearLayout>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/chat_recycler"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:background="@color/web_bg"
+        android:padding="12dp"
+        app:layout_constraintBottom_toTopOf="@+id/suggestion_scroll"
+        app:layout_constraintTop_toBottomOf="@+id/assistant_header" />
+
+    <HorizontalScrollView
+        android:id="@+id/suggestion_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:scrollbars="none"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="8dp"
+        android:background="#0D173D3C"
+        app:layout_constraintBottom_toTopOf="@id/input_area">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/chip_report"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/web_outline_button"
+                android:text="📋 How to report"
+                android:textAllCaps="false"
+                android:textColor="@color/web_primary"
+                android:textSize="11sp" />
+
+            <Button
+                android:id="@+id/chip_emergency"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/web_outline_button"
+                android:text="🚨 Emergency SOS"
+                android:textAllCaps="false"
+                android:textColor="@color/web_primary"
+                android:textSize="11sp" />
+
+            <Button
+                android:id="@+id/chip_loadshedding"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/web_outline_button"
+                android:text="⚡ Load Shedding"
+                android:textAllCaps="false"
+                android:textColor="@color/web_primary"
+                android:textSize="11sp" />
+
+            <Button
+                android:id="@+id/chip_water"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/web_outline_button"
+                android:text="💧 Water Leaks"
+                android:textAllCaps="false"
+                android:textColor="@color/web_primary"
+                android:textSize="11sp" />
+
+            <Button
+                android:id="@+id/chip_hero"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:background="@drawable/web_outline_button"
+                android:text="🏆 Hero Points"
+                android:textAllCaps="false"
+                android:textColor="@color/web_primary"
+                android:textSize="11sp" />
+        </LinearLayout>
+    </HorizontalScrollView>
 
     <LinearLayout
         android:id="@+id/input_area"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:background="@color/web_card"
         android:orientation="horizontal"
-        android:padding="16dp"
+        android:padding="12dp"
         app:layout_constraintBottom_toBottomOf="parent">
 
         <EditText
             android:id="@+id/edit_chat"
             android:layout_width="0dp"
-            android:layout_height="54dp"
+            android:layout_height="48dp"
             android:layout_weight="1"
-            android:background="@drawable/glass_card"
-            android:backgroundTint="@color/portal_input_bg"
-            android:hint="Ask me anything..."
-            android:paddingHorizontal="20dp"
-            android:textColor="@color/white"
-            android:textColorHint="@color/portal_text_secondary" />
+            android:background="@drawable/web_input"
+            android:hint="@string/wc_assistant_placeholder"
+            android:paddingHorizontal="16dp"
+            android:textColor="@color/web_text"
+            android:textColorHint="@color/web_text_muted" />
 
         <ImageButton
             android:id="@+id/btn_send"
-            android:layout_width="54dp"
-            android:layout_height="54dp"
-            android:layout_marginStart="12dp"
-            android:src="@drawable/ic_home"
-            android:background="@drawable/glass_card"
-            android:backgroundTint="@color/portal_button_orange"
-            app:tint="@color/white" />
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/web_hero_button"
+            android:contentDescription="@string/wc_assistant_placeholder"
+            android:src="@drawable/ic_send"
+            app:tint="@color/black" />
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

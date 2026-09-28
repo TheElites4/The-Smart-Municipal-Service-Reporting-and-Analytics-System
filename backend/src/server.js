@@ -113,12 +113,42 @@ const server = http.createServer(async (req, res) => {
         return json(res, 503, { ok: false, database: 'unavailable' }, req);
       }
     }
+    if (req.method === 'GET' && url.pathname === '/api/loadshedding/schedules') {
+      try {
+        const fs = require('fs');
+        const path = require('path');
+        const file = path.join(__dirname, '../data/eskom_loadshedding_schedules.json');
+        const content = fs.readFileSync(file, 'utf8');
+        return json(res, 200, JSON.parse(content), req);
+      } catch (err) {
+        return json(res, 500, { error: 'Failed to read loadshedding schedule dataset' }, req);
+      }
+    }
     if (req.method === 'GET' && url.pathname === '/api/location/status') {
       const latitude = url.searchParams.get('latitude');
       const longitude = url.searchParams.get('longitude');
-      if (!latitude || !longitude) return json(res, 400, { error: 'latitude and longitude are required' }, req);
-      const status = await eskomStatus(latitude, longitude);
-      if (!status) return json(res, 503, { error: 'Live EskomSePush status unavailable for this location' }, req);
+      let status = null;
+      if (latitude && longitude) {
+        status = await eskomStatus(latitude, longitude);
+      }
+      if (!status) {
+        try {
+          const fs = require('fs');
+          const path = require('path');
+          const file = path.join(__dirname, '../data/eskom_loadshedding_schedules.json');
+          const content = fs.readFileSync(file, 'utf8');
+          const dataset = JSON.parse(content);
+          return json(res, 200, {
+            current: false,
+            stage: dataset.currentNationalStage || 0,
+            areas: ["City of Johannesburg", "City of Tshwane", "eThekwini", "City of Cape Town", "Ekurhuleni"],
+            updatedAt: dataset.updatedAt,
+            source: 'Eskom & Municipal Schedule Dataset'
+          }, req);
+        } catch {
+          return json(res, 503, { error: 'Live EskomSePush status unavailable for this location' }, req);
+        }
+      }
       return json(res, 200, status, req);
     }
     if (req.method === 'POST' && url.pathname === '/api/auth/login') {
@@ -127,7 +157,7 @@ const server = http.createServer(async (req, res) => {
       const result = await query('SELECT id, full_name, email, role, municipality, department FROM app_users WHERE lower(email) = lower($1) AND password_hash = crypt($2, password_hash) AND is_active = true LIMIT 1', [input.email, input.password]);
       const account = result.rows[0];
       if (!account) return json(res, 401, { error: 'Invalid email or password' }, req);
-      const token = signToken({ sub: account.id, role: account.role, email: account.email, exp: Math.floor(Date.now() / 1000) + tokenTtlSeconds });
+      const token = signToken({ sub: account.id, role: account.role, email: account.email, municipality: account.municipality, exp: Math.floor(Date.now() / 1000) + tokenTtlSeconds });
       await query('UPDATE app_users SET last_seen_at = now() WHERE id = $1', [account.id]);
       return json(res, 200, { token, expiresIn: tokenTtlSeconds, user: { id: account.id, fullName: account.full_name, email: account.email, role: account.role, municipality: account.municipality, department: account.department } }, req);
     }
@@ -160,7 +190,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && url.pathname === '/api/users/anonymous') {
       const input = await body(req);
       const externalRef = typeof input.externalRef === 'string' && input.externalRef.trim() ? input.externalRef.trim() : crypto.randomUUID();
-      const result = await query(`INSERT INTO app_users (full_name, email, external_ref, role) VALUES ('Anonymous Citizen', $1, $2, 'citizen') ON CONFLICT (external_ref) DO UPDATE SET updated_at = now() RETURNING id, external_ref, role`, [`anonymous-${externalRef}@local.invalid`, externalRef]);
+      const result = await query(`INSERT INTO app_users (full_name, email, external_ref, role) VALUES ('Anonymous Citizen', $1, $2, 'citizen') ON CONFLICT (email) DO UPDATE SET external_ref = EXCLUDED.external_ref, updated_at = now() RETURNING id, external_ref, role`, [`anonymous-${externalRef}@local.invalid`, externalRef]);
       return json(res, 201, result.rows[0], req);
     }
 

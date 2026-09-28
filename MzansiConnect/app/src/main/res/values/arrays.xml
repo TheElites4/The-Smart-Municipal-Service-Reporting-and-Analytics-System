@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Matches web ReportForm ISSUE_CATEGORIES order/names -->
     <string-array name="report_categories">
-        <item>Water</item>
+        <item>Water &amp; Sanitation</item>
         <item>Electricity</item>
-        <item>Roads</item>
-        <item>Sanitation</item>
-        <item>Waste Management</item>
+        <item>Roads &amp; Potholes</item>
         <item>Street Lighting</item>
+        <item>Waste Management</item>
+        <item>Parks &amp; Recreation</item>
         <item>Other</item>
     </string-array>
 </resources>

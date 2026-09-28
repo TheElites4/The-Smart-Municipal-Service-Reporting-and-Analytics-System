@@ -1,1 +1,2 @@
-.auth-screen{background:linear-gradient(rgba(23,61,60,.78),rgba(23,61,60,.78)),url('../Citizen%20Portal%20Mobile%20App/src/imports/WhatsApp_Image_2026-05-11_at_22.41.20.jpeg') center/cover}.auth-card{background:rgba(255,255,255,.94)}
+.auth-screen{background:linear-gradient(135deg,rgba(13,38,36,.86),rgba(18,51,47,.78)),url('../Citizen%20Portal%20Mobile%20App/src/imports/WhatsApp_Image_2026-05-11_at_22.41.20.jpeg') center/cover}
+.auth-card{background:rgba(255,255,255,.97);backdrop-filter:blur(4px)}

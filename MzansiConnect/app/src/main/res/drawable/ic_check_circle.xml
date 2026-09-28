@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Check circle (lucide check-circle-2) - used in the tracking timeline step marker -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF1E5A7D"
+        android:pathData="M12,2a10,10 0,1 0,0.001 20.001A10,10 0,0 0,12 2zM10.5,16.5l-4,-4 1.4,-1.4 2.6,2.58 5.6,-5.58 1.4,1.42z" />
+</vector>

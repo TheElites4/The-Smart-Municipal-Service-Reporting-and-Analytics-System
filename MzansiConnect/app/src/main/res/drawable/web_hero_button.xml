@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Gold primary button: bg-[#FFB612] text-black -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/web_gold" />
+    <corners android:radius="12dp" />
+</shape>

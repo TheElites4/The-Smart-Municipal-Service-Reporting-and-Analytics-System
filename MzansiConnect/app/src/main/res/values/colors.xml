@@ -8,6 +8,30 @@
     <color name="red">#DE3831</color> <!-- SA Red -->
     <color name="blue">#002395</color> <!-- SA Blue -->
 
+    <!-- Web Citizen Portal parity palette (matches Citizen Portal Mobile App) -->
+    <color name="web_primary">#1E5A7D</color>      <!-- #1e5a7d blue -->
+    <color name="web_primary_dark">#16455F</color>
+    <color name="web_secondary">#4A8F8F</color>    <!-- #4a8f8f teal -->
+    <color name="web_gold">#FFB612</color>          <!-- #FFB612 gold -->
+    <color name="web_nav_start">#173D3C</color>     <!-- dashboard nav gradient start -->
+    <color name="web_nav_end">#176B5B</color>       <!-- dashboard nav gradient end -->
+    <color name="web_bg">#F8FAFC</color>            <!-- light background -->
+    <color name="web_card">#FFFFFF</color>
+    <color name="web_border">#E5E7EB</color>
+    <color name="web_text">#111827</color>
+    <color name="web_text_muted">#6B7280</color>
+
+    <!-- Status colors -->
+    <color name="status_submitted">#D97706</color>  <!-- amber-600 -->
+    <color name="status_progress">#2563EB</color>   <!-- blue-600 -->
+    <color name="status_resolved">#16A34A</color>   <!-- green-600 -->
+    <color name="status_submitted_bg">#FEF3C7</color>
+    <color name="status_progress_bg">#DBEAFE</color>
+    <color name="status_resolved_bg">#DCFCE7</color>
+    <color name="urgency_high">#DC2626</color>
+    <color name="urgency_medium">#F59E0B</color>
+    <color name="urgency_low">#22C55E</color>
+
     <!-- Portal Design Colors -->
     <color name="portal_bg_start">#0B4D3C</color>
     <color name="portal_bg_end">#06304D</color>

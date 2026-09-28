@@ -10,6 +10,8 @@ import android.widget.Button;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatDelegate;
+import androidx.core.os.LocaleListCompat;
 import androidx.fragment.app.Fragment;
 import androidx.navigation.Navigation;
 import com.example.mzansiconnect.R;
@@ -35,6 +37,20 @@ public class HomeFragment extends Fragment {
             startActivity(intent);
         });
 
+        View langEn = root.findViewById(R.id.btn_lang_en);
+        View langZu = root.findViewById(R.id.btn_lang_zu);
+        View langXh = root.findViewById(R.id.btn_lang_xh);
+        View langAf = root.findViewById(R.id.btn_lang_af);
+
+        if (langEn != null) langEn.setOnClickListener(v -> setAppLanguage("en"));
+        if (langZu != null) langZu.setOnClickListener(v -> setAppLanguage("zu"));
+        if (langXh != null) langXh.setOnClickListener(v -> setAppLanguage("xh"));
+        if (langAf != null) langAf.setOnClickListener(v -> setAppLanguage("af"));
+
         return root;
+    }
+
+    private void setAppLanguage(String languageCode) {
+        AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(languageCode));
     }
 }

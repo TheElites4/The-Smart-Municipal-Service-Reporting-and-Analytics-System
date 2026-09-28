@@ -66,6 +66,9 @@
         <action
             android:id="@+id/action_dashboard_to_detail"
             app:destination="@id/navigation_report_detail" />
+        <action
+            android:id="@+id/action_dashboard_to_community"
+            app:destination="@id/navigation_community_feed" />
     </fragment>
 
     <fragment
@@ -79,6 +82,18 @@
         android:name="com.example.mzansiconnect.ui.report.ReportDetailFragment"
         android:label="Report Tracking"
         tools:layout="@layout/fragment_report_detail" />
+
+    <fragment
+        android:id="@+id/navigation_community_feed"
+        android:name="com.example.mzansiconnect.ui.community.CommunityFeedFragment"
+        android:label="Community Feed"
+        tools:layout="@layout/fragment_community_feed" />
+
+    <fragment
+        android:id="@+id/navigation_municipality_directory"
+        android:name="com.example.mzansiconnect.ui.municipality.MunicipalityDirectoryFragment"
+        android:label="Municipality Directory"
+        tools:layout="@layout/fragment_municipality_directory" />
 
     <fragment
         android:id="@+id/navigation_home"

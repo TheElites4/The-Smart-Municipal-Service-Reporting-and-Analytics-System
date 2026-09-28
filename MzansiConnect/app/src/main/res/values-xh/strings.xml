@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MzansiReport</string>
+    <string name="slogan">Iinkonzo zikaMasipala eziKrelekrele</string>
+    <string name="mission">Ukuxhobisa uluntu loMzantsi Afrika ngokunikezelwa kweenkonzo zikamasipala ezingafihlakaliyo, ezisebenzayo neziphendulayo.</string>
+
+    <string name="welcome">Wamkelekile</string>
+    <string name="sos_title">Uncedo oluNgxamisekileyo</string>
+    <string name="sos_desc">Cofa ukuze ufumane uncedo ngokukhawuleza</string>
+    <string name="how_it_works">Isebenza njani</string>
+
+    <string name="wc_tagline">Iinkonzo zikaMasipala eziKrelekrele</string>
+    <string name="wc_get_started">Qalisa</string>
+    <string name="wc_track_progress">Landela uMuqhubela phambili</string>
+    <string name="wc_login">Ngena</string>
+    <string name="wc_logout">Phuma</string>
+    <string name="wc_new_report">Ingxelo eNtsha</string>
+    <string name="wc_my_reports">Iingxelo zaM</string>
+    <string name="wc_total_reports">IiNgxelo eziPheleleyo</string>
+    <string name="wc_in_progress">Iyaqhubeka</string>
+    <string name="wc_resolved">Isongiwe</string>
+    <string name="wc_submit_report">Ngenisa iNgxelo</string>
+    <string name="wc_community_feed">Uluntu lweNdaba</string>
+    <string name="wc_me_too">Nam</string>
+    <string name="wc_emergency_sos">Uncedo oluNgxamisekileyo</string>
+    <string name="wc_no_reports">Akukho ngxelo okwangoku</string>
+    <string name="wc_submit_first">Ngenisa ingxelo yakho yokuqala ukuze uqalise</string>
+    <string name="wc_view_details">Jonga iiNkcukacha</string>
+    <string name="wc_submit_report_title">Ngenisa iNgxelo eNtsha</string>
+    <string name="wc_report_details_title">iiNkcukacha zeNgxelo</string>
+    <string name="wc_report_tracking">uMkhondo we-MzansiReport</string>
+    <string name="wc_back_to_dashboard">Buyela kwiDashboard</string>
+    <string name="wc_select_category">Khetha uDidi lweNgxaki</string>
+    <string name="wc_description">Inkcazo</string>
+    <string name="wc_location">Indawo</string>
+    <string name="wc_urgency">iNqanaba loKuNgxamiseka</string>
+    <string name="wc_urgency_low">Phantsi</string>
+    <string name="wc_urgency_medium">Phakathi</string>
+    <string name="wc_urgency_high">Phezulu</string>
+    <string name="wc_cancel">Rhoxisa</string>
+    <string name="wc_category_water">Amanzi noCoceko</string>
+    <string name="wc_category_electricity">uMbane</string>
+    <string name="wc_category_roads">Iindlela neMigodi</string>
+    <string name="wc_category_streetlights">uKhanyiso lweSitrato</string>
+    <string name="wc_category_waste">uLawulo lweNkunkuma</string>
+    <string name="wc_category_parks">iiPaki nokuLonwaba</string>
+    <string name="wc_category_other">Enye</string>
+    <string name="wc_police">Amapolisa</string>
+    <string name="wc_fire">Umlilo</string>
+    <string name="wc_medical">Unyango</string>
+    <string name="wc_load_shedding_status">UkuCinywa koMbane</string>
+    <string name="wc_hero_points">Amanqaku eQhawe loLuntu</string>
+    <string name="wc_hero_level_bronze">Qhawe leBhronzi</string>
+    <string name="wc_hero_level_silver">Qhawe leSiliva</string>
+    <string name="wc_hero_level_gold">Qhawe leGolide</string>
+    <string name="wc_hero_level_platinum">Qhawe lePlatinam</string>
+    <string name="wc_hero_level_diamond">Qhawe leDayimani</string>
+    <string name="assistant_title">Umncedisi wabAmi</string>
+    <string name="assistant_subtitle">Uncedo lwe-AI</string>
+    <string name="assistant_open">Umncedisi</string>
+    <string name="assistant_placeholder">Buza nantoni na...</string>
+    <string name="assistant_welcome">Molo! ✋ Ndingumncedisi wakho we-MzansiReport. Ngingakunceda njani namhlanje?</string>
+</resources>

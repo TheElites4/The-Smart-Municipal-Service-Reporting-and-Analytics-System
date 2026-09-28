@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Outline button: border-[#1e5a7d] text-[#1e5a7d] -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/web_card" />
+    <corners android:radius="12dp" />
+    <stroke android:width="1.5dp" android:color="@color/web_primary" />
+</shape>

@@ -38,6 +38,7 @@
                     android:textStyle="bold" />
 
                 <LinearLayout
+                    android:id="@+id/lang_selector_container"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_alignParentEnd="true"
@@ -46,8 +47,10 @@
                     android:background="@drawable/glass_card"
                     android:backgroundTint="#33FFFFFF"
                     android:padding="4dp">
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="EN" android:textColor="@color/accent" android:textSize="10sp" android:textStyle="bold" android:paddingHorizontal="4dp" />
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="ZU" android:textColor="@color/white" android:textSize="10sp" android:paddingHorizontal="4dp" />
+                    <TextView android:id="@+id/btn_lang_en" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="EN" android:textColor="@color/accent" android:textSize="11sp" android:textStyle="bold" android:paddingHorizontal="6dp" android:paddingVertical="4dp" />
+                    <TextView android:id="@+id/btn_lang_zu" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="ZU" android:textColor="@color/white" android:textSize="11sp" android:paddingHorizontal="6dp" android:paddingVertical="4dp" />
+                    <TextView android:id="@+id/btn_lang_xh" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="XH" android:textColor="@color/white" android:textSize="11sp" android:paddingHorizontal="6dp" android:paddingVertical="4dp" />
+                    <TextView android:id="@+id/btn_lang_af" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="AF" android:textColor="@color/white" android:textSize="11sp" android:paddingHorizontal="6dp" android:paddingVertical="4dp" />
                 </LinearLayout>
             </RelativeLayout>
 

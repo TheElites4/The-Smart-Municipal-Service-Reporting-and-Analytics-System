@@ -1,145 +1,328 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Mirrors web Citizen Portal ReportDetail.tsx -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/portal_background">
+    android:background="@color/web_bg"
+    android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="20dp">
+        android:orientation="vertical">
 
-        <androidx.cardview.widget.CardView
+        <!-- Header: gradient + back -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:cardCornerRadius="24dp"
-            app:cardElevation="0dp"
-            android:backgroundTint="@android:color/transparent">
+            android:background="@drawable/web_form_header_gradient"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="16dp">
 
+            <ImageButton
+                android:id="@+id/btn_detail_back"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@drawable/circle_bg"
+                android:contentDescription="@string/wc_back_to_dashboard"
+                android:src="@drawable/ic_back_white"
+                app:tint="@color/white" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/wc_report_details_title"
+                    android:textColor="@color/white"
+                    android:textSize="17sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/wc_report_tracking"
+                    android:textColor="#CCFFFFFF"
+                    android:textSize="11sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <!-- AI detected banner -->
+            <TextView
+                android:id="@+id/detail_ai_banner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/chip_bg"
+                android:padding="12dp"
+                android:textColor="@color/web_primary"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
+            <!-- Main info card -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="@drawable/glass_card"
+                android:background="@drawable/web_card"
                 android:orientation="vertical"
-                android:padding="24dp">
+                android:padding="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/detail_reference"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textColor="@color/web_text"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/detail_status"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/chip_bg"
+                        android:paddingHorizontal="10dp"
+                        android:paddingVertical="4dp"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:text="@string/wc_category_label"
+                    android:textColor="@color/web_text_muted"
+                    android:textSize="12sp" />
 
                 <TextView
                     android:id="@+id/detail_category"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Water Service"
-                    android:textStyle="bold"
-                    android:textColor="@color/accent"
-                    android:textSize="22sp" />
-
-                <TextView
-                    android:id="@+id/detail_status"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="In Progress"
-                    android:textColor="@color/portal_badge_green"
+                    android:textColor="@color/web_text"
+                    android:textSize="15sp"
                     android:textStyle="bold" />
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:orientation="horizontal">
-
-                    <Button
-                        android:id="@+id/btn_me_too"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="ME TOO (+1)"
-                        android:textSize="10sp"
-                        android:backgroundTint="@color/portal_badge_blue"
-                        app:cornerRadius="20dp" />
-
-                    <Button
-                        android:id="@+id/btn_share_whatsapp"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
-                        android:text="WARD SHARE"
-                        android:textSize="10sp"
-                        android:backgroundTint="#25D366"
-                        app:cornerRadius="20dp" />
-                </LinearLayout>
-
                 <TextView
-                    android:id="@+id/detail_municipality"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:text="City of Johannesburg"
-                    android:textColor="@color/white" />
-
-                <TextView
-                    android:id="@+id/detail_location"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="-26.2041, 28.0473"
-                    android:textColor="@color/portal_text_secondary"
+                    android:layout_marginTop="14dp"
+                    android:text="@string/wc_description"
+                    android:textColor="@color/web_text_muted"
                     android:textSize="12sp" />
-
-                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#26FFFFFF" android:layout_marginVertical="16dp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Description"
-                    android:textColor="@color/white"
-                    android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/detail_description"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:text="Major water leak on the corner of 5th and Madiba."
-                    android:textColor="@color/portal_text_secondary"
+                    android:textColor="@color/web_text"
                     android:textSize="14sp" />
 
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:text="@string/wc_location"
+                    android:textColor="@color/web_text_muted"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/detail_location"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/web_text"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:text="@string/wc_submitted_label"
+                    android:textColor="@color/web_text_muted"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/detail_submitted"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/web_text"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:text="@string/wc_urgency_label"
+                    android:textColor="@color/web_text_muted"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/detail_urgency"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:background="@drawable/chip_bg"
+                    android:paddingHorizontal="10dp"
+                    android:paddingVertical="4dp"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
             </LinearLayout>
-        </androidx.cardview.widget.CardView>
 
-        <!-- Timeline -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
-            android:text="Resolution Timeline"
-            android:textColor="@color/white"
-            android:textStyle="bold"
-            android:textSize="18sp" />
+            <!-- SLA countdown -->
+            <LinearLayout
+                android:id="@+id/card_sla"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/web_card"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="16dp">
 
-        <androidx.cardview.widget.CardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            app:cardCornerRadius="24dp"
-            app:cardElevation="0dp"
-            android:backgroundTint="@android:color/transparent">
+                <ImageView
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="@drawable/circle_bg"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_security_small"
+                    app:tint="@color/status_progress" />
 
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/sla_title"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/wc_sla_countdown"
+                        android:textColor="@color/status_progress"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/sla_detail"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/web_text_muted"
+                        android:textSize="12sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Photo gallery -->
+            <LinearLayout
+                android:id="@+id/card_photos"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/web_card"
+                android:orientation="vertical"
+                android:padding="16dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/photos_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/web_text"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:id="@+id/photos_container"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:orientation="horizontal" />
+            </LinearLayout>
+
+            <!-- Tracking timeline -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="@drawable/glass_card"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/web_card"
                 android:orientation="vertical"
-                android:padding="24dp">
+                android:padding="16dp">
 
-                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
-                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/ic_lock_small" app:tint="@color/portal_badge_green" />
-                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginStart="16dp">
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Submitted" android:textColor="@color/white" android:textStyle="bold" />
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Today - 10:00 AM" android:textColor="@color/portal_text_secondary" android:textSize="12sp" />
-                    </LinearLayout>
-                </LinearLayout>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/wc_track_progress"
+                    android:textColor="@color/web_text"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:id="@+id/timeline_container"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:orientation="vertical" />
+
+                <TextView
+                    android:id="@+id/timeline_empty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/wc_no_status_events"
+                    android:textColor="@color/web_text_muted"
+                    android:textSize="12sp"
+                    android:visibility="gone" />
             </LinearLayout>
-        </androidx.cardview.widget.CardView>
 
+            <!-- Actions -->
+            <Button
+                android:id="@+id/btn_share_whatsapp"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginTop="16dp"
+                android:background="@drawable/web_whatsapp_button"
+                android:text="@string/wc_share_whatsapp"
+                android:textAllCaps="false"
+                android:textColor="@color/white"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/btn_me_too"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/web_outline_button"
+                android:text="@string/wc_me_too"
+                android:textAllCaps="false"
+                android:textColor="@color/web_primary" />
+
+            <Button
+                android:id="@+id/btn_back_dashboard"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/web_outline_button"
+                android:text="@string/wc_back_to_dashboard"
+                android:textAllCaps="false"
+                android:textColor="@color/web_primary" />
+
+        </LinearLayout>
     </LinearLayout>
 </ScrollView>

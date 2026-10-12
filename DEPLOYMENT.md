@@ -34,7 +34,7 @@ psql $env:DATABASE_URL -f backend/seed.sql
    resets the seeded account passwords.
 
 2. Copy `backend/.env.example` to `backend/.env`. Configure a long random
-   `AUTH_SECRET`, the same `DATABASE_URL`, a real MFA provider as described
+   `AUTH_SECRET`, the same `DATABASE_URL`, Firebase email-link sign-in as described
    below, and local browser origins:
 
 ```text
@@ -93,48 +93,63 @@ as offline submissions.
    different device, configure the API host and allowed origin for the LAN.
 
 ## Real staff/admin MFA
-Dashboard login requires a one-time code sent to an actual email address or
-phone number. Email uses Resend; SMS uses Twilio. The repository cannot create
-provider accounts, secrets, verified sender domains, or real staff contacts.
-Run the interactive setup after obtaining those values from the provider and
-staff/admin users:
+Staff/admin dashboard login uses **Google Firebase email-link sign-in** as
+the second factor. Firebase MFA only applies to those dashboard accounts;
+citizen registration and Android push notifications keep their existing flows.
+The Render Blueprint enables Firebase MFA for project `mzansireport-e01b4`.
+For local setup, enable email-link sign-in in Firebase and check the Web app
+configuration in the repository-root `firebase-config.js`.
+
+In `backend/.env`, set `MFA_PROVIDER=firebase` and
+`FIREBASE_PROJECT_ID=mzansireport-e01b4`, then restart the API. To validate
+those values from PowerShell:
 
 ```powershell
 Set-Location backend
-.\configure-mfa.ps1
-# Select resend; the script sets MFA_EMAIL_FROM to onboarding@resend.dev
+$env:MFA_PROVIDER = 'firebase'
+$env:FIREBASE_PROJECT_ID = 'mzansireport-e01b4'
 npm.cmd run check:deployment
+Remove-Item Env:MFA_PROVIDER,Env:FIREBASE_PROJECT_ID
 ```
 
-The script writes provider values to `backend/.env` without printing them and
-can update the admin email/phone in PostgreSQL. When using Resend's
-`onboarding@resend.dev` testing sender, use the email address associated with
-your Resend account as the admin recipient if Resend rejects other recipients.
-This sender is for testing, not unrestricted production delivery. The script
-does not accept placeholders.
-Restart the backend after changing `.env`. Set `RESEND_API_KEY` and a
-verified `MFA_EMAIL_FROM` sender for email, or set `TWILIO_ACCOUNT_SID`,
-`TWILIO_AUTH_TOKEN`, and `TWILIO_FROM_NUMBER` for SMS. Keep secrets in the local
-environment or a deployment secret manager, never in source control.
-
-Update each staff/admin account with an inbox/phone that the user can access.
-Phone numbers must be in international E.164 format, for example `+27821234567`.
-The seeded `example.gov.za` addresses are placeholders and cannot receive mail;
-replace the initial admin address in PostgreSQL before the first dashboard login. For example:
+Ensure every existing staff/admin account has a real, reachable email address.
+The seeded `example.gov.za` addresses are placeholders; replace the initial
+admin account email in PostgreSQL before the first dashboard login.
+For example:
 
 ```powershell
-psql $env:DATABASE_URL -c "UPDATE app_users SET email='admin@your-real-domain.za', phone='+27821234567' WHERE email='admin@example.gov.za';"
+psql $env:DATABASE_URL -c "UPDATE app_users SET email='admin@your-real-domain.za' WHERE email='admin@example.gov.za';"
 ```
 
-Use the new email as the admin login. Then use the admin dashboard to create
-staff accounts with their real delivery details. The server returns an error and does not
-issue a dashboard token if delivery is not configured or the provider rejects
-the message. Codes expire after 10 minutes, allow at most five attempts, and
-are stored hashed in PostgreSQL. Apply migration `004_mfa_challenges.sql` before
-starting the updated API. Existing databases must also apply
+Use the new email as the admin login. Update the seeded staff account too, or
+remove it and create a replacement with a real email address. Then use the admin
+dashboard to create staff accounts. The server issues no dashboard token until
+Firebase verifies the account email and the password challenge is valid. Existing
+databases must apply
 `005_service_categories.sql` and `006_municipalities_and_photos.sql`, then run
 `npm.cmd run import:municipalities`, before using the report forms. The importer
 aborts instead of importing an incomplete municipality directory.
+An admin can update an existing staff member's contact phone number in the
+**Update a staff phone number** panel without changing the account password.
+
+Enable Firebase email-link authentication in project `mzansireport-e01b4`:
+
+1. Add a **Web app**, then enable **Authentication -> Sign-in method ->
+   Email/Password** and its **Email link (passwordless sign-in)** option.
+2. Make sure the Web app config in the repository-root `firebase-config.js`
+   contains that Web app's `appId`. The `google-services.json` file is for the
+   Android app and is not used by the dashboards.
+3. Add the dashboard hosts under **Authentication -> Settings -> Authorized
+   domains**. `localhost` is already authorized in this project; hosted
+   deployments still need their exact domains added.
+The dashboards send an email link after the password step; the API validates the
+Firebase ID token against Google's public certificates and requires its verified
+email to match the active account before issuing a dashboard token. The link is
+valid only with the signed password challenge, which expires after ten minutes.
+Add each dashboard website's domain to Firebase Authentication's authorized
+domains and to the API's `ALLOWED_ORIGINS`. The
+Render Blueprint includes GitHub Pages and the default Firebase Hosting domains;
+update `ALLOWED_ORIGINS` if you use a custom domain.
 
 ## Database-backed analytics and dropdown options
 

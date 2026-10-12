@@ -1,8 +1,16 @@
-import { Menu, X, ChevronRight, MapPin, FileText, BarChart3, Shield } from 'lucide-react';
+import { Menu, X, ChevronRight, MapPin, FileText, BarChart3, Shield, ChevronDown, LayoutDashboard, Users } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from './ui/button';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { useTranslation, type Language } from '../utils/i18n';
+
+// Staff and Admin dashboards are separate static apps. Default to the local
+// static server; override with VITE_STAFF_DASHBOARD_URL / VITE_ADMIN_DASHBOARD_URL
+// in deployment so the links point at the hosted dashboards.
+const STAFF_DASHBOARD_URL =
+  import.meta.env.VITE_STAFF_DASHBOARD_URL || 'http://localhost:8080/Staff%20Dashboard/';
+const ADMIN_DASHBOARD_URL =
+  import.meta.env.VITE_ADMIN_DASHBOARD_URL || 'http://localhost:8080/Admin%20Dashboard/';
 
 interface HomePageProps {
   onGetStarted: () => void;
@@ -14,6 +22,7 @@ interface HomePageProps {
 export function HomePage({ onGetStarted, onLogin, language, onLanguageChange }: HomePageProps) {
   const { t } = useTranslation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [dashboardsOpen, setDashboardsOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-background">
@@ -88,14 +97,60 @@ export function HomePage({ onGetStarted, onLogin, language, onLanguageChange }: 
           <p className="text-lg md:text-xl text-white/95 mb-8 max-w-3xl mx-auto drop-shadow-md">
             {t('heroDesc')}
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button onClick={onGetStarted} size="lg" className="bg-[#FFB612] text-black hover:bg-[#FFB612]/90 shadow-lg">
-              {t('getStarted')}
-              <ChevronRight className="w-5 h-5 ml-2" />
-            </Button>
-            <Button onClick={onLogin} size="lg" variant="outline" className="bg-white/90 text-[#1e5a7d] hover:bg-white border-white shadow-lg">
-              {t('trackProgress')}
-            </Button>
+          <div className="flex flex-col items-center gap-4">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button onClick={onGetStarted} size="lg" className="bg-[#FFB612] text-black hover:bg-[#FFB612]/90 shadow-lg">
+                {t('getStarted')}
+                <ChevronRight className="w-5 h-5 ml-2" />
+              </Button>
+              <Button onClick={onLogin} size="lg" variant="outline" className="bg-white/90 text-[#1e5a7d] hover:bg-white border-white shadow-lg">
+                {t('trackProgress')}
+              </Button>
+            </div>
+
+            {/* Staff / Admin dashboard quick access */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setDashboardsOpen((open) => !open)}
+                aria-expanded={dashboardsOpen}
+                aria-haspopup="true"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#1e5a7d]/90 text-white text-sm font-semibold shadow-lg backdrop-blur-sm hover:bg-[#1e5a7d] transition-colors"
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                Staff &amp; Admin dashboards
+                <ChevronDown className={`w-4 h-4 transition-transform ${dashboardsOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {dashboardsOpen && (
+                <div className="absolute left-1/2 -translate-x-1/2 mt-2 w-64 rounded-xl bg-white shadow-2xl border border-border overflow-hidden z-50">
+                  <a
+                    href={STAFF_DASHBOARD_URL}
+                    className="flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                  >
+                    <span className="w-9 h-9 rounded-lg bg-[#4a8f8f]/15 flex items-center justify-center flex-shrink-0">
+                      <LayoutDashboard className="w-4 h-4 text-[#1e5a7d]" />
+                    </span>
+                    <span>
+                      <span className="block text-sm font-semibold text-[#1e5a7d]">Staff dashboard</span>
+                      <span className="block text-xs text-muted-foreground">Municipality service queue</span>
+                    </span>
+                  </a>
+                  <a
+                    href={ADMIN_DASHBOARD_URL}
+                    className="flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors border-t border-border"
+                  >
+                    <span className="w-9 h-9 rounded-lg bg-[#FFB612]/20 flex items-center justify-center flex-shrink-0">
+                      <Users className="w-4 h-4 text-[#1e5a7d]" />
+                    </span>
+                    <span>
+                      <span className="block text-sm font-semibold text-[#1e5a7d]">Admin dashboard</span>
+                      <span className="block text-xs text-muted-foreground">Workforce management &amp; analytics</span>
+                    </span>
+                  </a>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </section>

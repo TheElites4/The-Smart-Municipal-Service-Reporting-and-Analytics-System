@@ -169,11 +169,23 @@ public class DashboardFragment extends Fragment {
 
                     if (isCurrent && stage > 0) {
                         loadSheddingDetail.setText("Stage " + stage + " Active · " + areaName);
+                    } else if (isCurrent) {
+                        loadSheddingDetail.setText("Load shedding is active · " + areaName);
                     } else {
-                        loadSheddingDetail.setText("Live load-shedding status unavailable.");
+                        loadSheddingDetail.setText("No active load shedding · " + areaName);
                     }
                 } else {
-                    loadSheddingDetail.setText("Live load-shedding status unavailable.");
+                    String message = "Live load-shedding status unavailable.";
+                    try {
+                        if (response.errorBody() != null) {
+                            String providerError = new org.json.JSONObject(response.errorBody().string())
+                                    .optString("error", "");
+                            if (!providerError.isEmpty()) message = providerError;
+                        }
+                    } catch (org.json.JSONException | java.io.IOException error) {
+                        android.util.Log.w("DashboardFragment", "Unable to parse load-shedding API error response", error);
+                    }
+                    loadSheddingDetail.setText(message);
                 }
             }
 

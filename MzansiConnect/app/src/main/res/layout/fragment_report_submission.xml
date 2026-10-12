@@ -75,22 +75,12 @@
                 android:visibility="gone" />
 
             <!-- Icon grid of categories (icons are assigned from /api/options at runtime) -->
-            <LinearLayout
+            <GridLayout
                 android:id="@+id/category_grid"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:orientation="vertical" />
-
-            <TextView
-                android:id="@+id/tv_selected_category"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:textColor="@color/web_primary"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:visibility="gone" />
+                android:columnCount="2" />
 
             <TextView
                 android:layout_width="match_parent"
@@ -177,8 +167,7 @@
                 android:textColor="@color/web_text_muted"
                 android:textSize="11sp" />
 
-            <!-- Category is chosen from the icon grid above.
-            Location -->
+            <!-- Location -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"

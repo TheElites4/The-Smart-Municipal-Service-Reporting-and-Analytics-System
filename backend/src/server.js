@@ -80,29 +80,137 @@ const requireRole = (req, url, roles) => {
   return user && roles.includes(user.role) ? user : null;
 };
 const hashPassword = (password, salt = crypto.randomBytes(16).toString('hex')) => `${salt}:${crypto.scryptSync(password, salt, 64).toString('hex')}`;
-const reverseGeocode = async (latitude, longitude) => {
-  const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(latitude)}&lon=${encodeURIComponent(longitude)}`, { headers: { 'user-agent': 'MzansiConnect/1.0 contact@example.gov.za', accept: 'application/json' } });
-  if (!response.ok) return null;
-  const place = await response.json();
-  return place.address?.suburb || place.address?.city_district || place.address?.city || place.address?.town || null;
+
+/**
+ * Firebase MFA support for the staff/admin dashboards.
+ *
+ * The dashboards use the Firebase Web SDK (email-link authentication) to prove
+ * control of the account email. Firebase then returns a signed ID token; the
+ * dashboard posts that token here and ONLY this server decides whether it is
+ * genuine before issuing a dashboard session. The token is verified against
+ * Google's rotating public certificates (RS256) with the project id as audience
+ * and issuer, so a forged token cannot be used to sign in.
+ */
+const firebaseProjectId = process.env.FIREBASE_PROJECT_ID || '';
+const firebaseEnabled = String(process.env.MFA_PROVIDER || 'firebase').toLowerCase() === 'firebase';
+if (!firebaseEnabled) throw new Error('MFA_PROVIDER must be firebase for staff/admin dashboard sign-in');
+if (process.env.NODE_ENV === 'production' && !firebaseProjectId) {
+  throw new Error('FIREBASE_PROJECT_ID must be configured for staff/admin dashboard sign-in');
+}
+if (firebaseProjectId && !/^[a-z0-9-]{4,}$/i.test(firebaseProjectId)) {
+  throw new Error('FIREBASE_PROJECT_ID does not look like a Firebase project id');
+}
+const firebaseCertUrl = 'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com';
+const firebaseCerts = { keys: null, expiresAt: 0 };
+
+const base64UrlToBuffer = (value) => Buffer.from(String(value).replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+
+const loadFirebaseCerts = async () => {
+  if (firebaseCerts.keys && Date.now() < firebaseCerts.expiresAt) return firebaseCerts.keys;
+  const response = await fetch(firebaseCertUrl);
+  if (!response.ok) throw new Error('Unable to load Firebase signing certificates');
+  const keys = await response.json();
+  // Cache for the lifetime Google advertises; fall back to one hour.
+  const cacheControl = response.headers.get('cache-control') || '';
+  const maxAge = Number((cacheControl.match(/max-age=(\d+)/) || [])[1]) || 3600;
+  firebaseCerts.keys = keys;
+  firebaseCerts.expiresAt = Date.now() + maxAge * 1000;
+  return keys;
 };
-const eskomStatus = async (latitude, longitude) => {
+
+const verifyFirebaseIdToken = async (idToken) => {
+  if (!firebaseProjectId) throw new Error('FIREBASE_PROJECT_ID is not configured');
+  const parts = String(idToken || '').split('.');
+  if (parts.length !== 3) throw new Error('Malformed Firebase ID token');
+  const header = JSON.parse(base64UrlToBuffer(parts[0]).toString('utf8'));
+  const payload = JSON.parse(base64UrlToBuffer(parts[1]).toString('utf8'));
+  if (header.alg !== 'RS256') throw new Error('Unsupported Firebase token algorithm');
+  const certs = await loadFirebaseCerts();
+  const pem = certs[header.kid];
+  if (!pem) throw new Error('Unknown Firebase signing key');
+  const verifier = crypto.createVerify('RSA-SHA256');
+  verifier.update(`${parts[0]}.${parts[1]}`);
+  if (!verifier.verify(pem, base64UrlToBuffer(parts[2]))) throw new Error('Invalid Firebase token signature');
+  const now = Math.floor(Date.now() / 1000);
+  if (!payload.exp || payload.exp < now) throw new Error('Firebase token has expired');
+  if (!payload.iat || payload.iat > now + 300) throw new Error('Firebase token issued in the future');
+  if (payload.aud !== firebaseProjectId) throw new Error('Firebase token audience mismatch');
+  if (payload.iss !== `https://securetoken.google.com/${firebaseProjectId}`) throw new Error('Firebase token issuer mismatch');
+  if (process.env.FIREBASE_TENANT_ID && payload.firebase?.tenant !== process.env.FIREBASE_TENANT_ID) throw new Error('Firebase tenant mismatch');
+  if (!payload.sub) throw new Error('Firebase token is missing a subject');
+  return payload;
+};
+
+const reverseGeocode = async (latitude, longitude) => {
+  const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&lat=${encodeURIComponent(latitude)}&lon=${encodeURIComponent(longitude)}`, {
+    headers: { 'user-agent': process.env.GEOCODER_USER_AGENT || 'MzansiConnect/1.0', accept: 'application/json' },
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!response.ok) {
+    console.error(`Reverse geocoder returned HTTP ${response.status}`);
+    throw Object.assign(new Error('Location lookup is temporarily unavailable'), { statusCode: 503 });
+  }
+  const place = await response.json();
+  const address = place.address || {};
+  return address.suburb || address.city_district || address.neighbourhood || address.city || address.town || address.municipality || null;
+};
+const eskomStatus = async (latitude, longitude, municipality) => {
   const token = process.env.ESKOM_SE_PUSH_TOKEN;
-  if (!token) return null;
-  const areaText = await reverseGeocode(latitude, longitude);
-  if (!areaText) return null;
-  const search = await fetch(`https://developer.sepush.co.za/business/2.0/areasearch?text=${encodeURIComponent(areaText)}`, { headers: { Token: token, accept: 'application/json' } });
-  if (!search.ok) return null;
-  const areas = await search.json();
-  const area = areas.areas?.[0];
-  if (!area?.id) return null;
-  const statusResponse = await fetch(`https://developer.sepush.co.za/business/2.0/status?id=${encodeURIComponent(area.id)}`, { headers: { Token: token, accept: 'application/json' } });
-  if (!statusResponse.ok) return null;
+  if (!token || /^(replace-with|your[-_ ]|placeholder)/i.test(token.trim())) {
+    throw Object.assign(new Error('Live load-shedding status is not configured. Set ESKOM_SE_PUSH_TOKEN on the API service.'), { statusCode: 503 });
+  }
+
+  const areaText = municipality?.trim() || (latitude !== null && longitude !== null
+    ? await reverseGeocode(latitude, longitude)
+    : null);
+  let statusUrl = 'https://developer.sepush.co.za/business/2.0/status';
+  let areaName = 'South Africa';
+  if (areaText) {
+    const search = await fetch(`https://developer.sepush.co.za/business/2.0/areasearch?text=${encodeURIComponent(areaText)}`, {
+      headers: { Token: token, accept: 'application/json' },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!search.ok) {
+      console.error(`EskomSePush area search returned HTTP ${search.status}`);
+      throw Object.assign(new Error(search.status === 401 || search.status === 403
+        ? 'EskomSePush rejected its API token. Check ESKOM_SE_PUSH_TOKEN.'
+        : `EskomSePush area search failed (HTTP ${search.status}).`), { statusCode: 503 });
+    }
+    const areas = await search.json();
+    const matches = Array.isArray(areas.areas) ? areas.areas : [];
+    const area = matches.find((candidate) => normaliseMunicipality(candidate.name) === normaliseMunicipality(areaText)) || matches[0];
+    if (!area?.id) {
+      throw Object.assign(new Error(`EskomSePush has no matching area for "${areaText}".`), { statusCode: 503 });
+    }
+    statusUrl += `?id=${encodeURIComponent(area.id)}`;
+    areaName = area.name;
+  }
+
+  const statusResponse = await fetch(statusUrl, {
+    headers: { Token: token, accept: 'application/json' },
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!statusResponse.ok) {
+    console.error(`EskomSePush status returned HTTP ${statusResponse.status}`);
+    throw Object.assign(new Error(statusResponse.status === 401 || statusResponse.status === 403
+      ? 'EskomSePush rejected its API token. Check ESKOM_SE_PUSH_TOKEN.'
+      : `EskomSePush status lookup failed (HTTP ${statusResponse.status}).`), { statusCode: 503 });
+  }
   const status = await statusResponse.json();
   const now = Date.now();
-  const active = (status.events || []).find((event) => new Date(event.start).getTime() <= now && new Date(event.end).getTime() >= now);
-  const stageMatch = String(active?.note || active?.info || '').match(/stage\s*(\d+)/i);
-  return { current: Boolean(active), stage: stageMatch ? Number(stageMatch[1]) : null, areas: [area.name], updatedAt: new Date().toISOString(), source: 'EskomSePush' };
+  const events = Array.isArray(status.events) ? status.events : [];
+  const active = events.find((event) => {
+    const startsAt = Date.parse(event.start);
+    const endsAt = Date.parse(event.end);
+    return Number.isFinite(startsAt) && Number.isFinite(endsAt) && startsAt <= now && endsAt >= now;
+  });
+  const eskomStage = status.status?.eskom?.stage ?? status.stage;
+  const stageText = active?.note || active?.info ||
+    (typeof eskomStage === 'string' ? `Stage ${eskomStage}` : '') ||
+    (typeof status.status === 'string' ? status.status : '');
+  const stageMatch = String(stageText).match(/stage\s*(\d+)/i);
+  const stage = stageMatch ? Number(stageMatch[1]) : Number(eskomStage) || 0;
+  return { current: Boolean(active) || stage > 0, stage, areas: [areaName], updatedAt: new Date().toISOString(), source: 'EskomSePush' };
 };
 const broadcast = (event, payload) => {
   const message = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
@@ -191,21 +299,74 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && url.pathname === '/api/location/status') {
       const latitude = url.searchParams.get('latitude');
       const longitude = url.searchParams.get('longitude');
-      let status = null;
-      if (latitude && longitude) {
-        status = await eskomStatus(latitude, longitude);
+      if ((latitude && !longitude) || (!latitude && longitude)) return json(res, 400, { error: 'latitude and longitude must be provided together' }, req);
+      if (latitude && (!Number.isFinite(Number(latitude)) || Number(latitude) < -90 || Number(latitude) > 90)) return json(res, 400, { error: 'latitude must be between -90 and 90' }, req);
+      if (longitude && (!Number.isFinite(Number(longitude)) || Number(longitude) < -180 || Number(longitude) > 180)) return json(res, 400, { error: 'longitude must be between -180 and 180' }, req);
+      try {
+        const status = await eskomStatus(latitude, longitude, url.searchParams.get('municipality'));
+        return json(res, 200, status, req);
+      } catch (error) {
+        if (error.statusCode) return json(res, error.statusCode, { error: error.message }, req);
+        console.error(`Load-shedding provider request failed (${error.name || 'Error'})`);
+        return json(res, 503, { error: 'Live load-shedding provider is unavailable. Check API connectivity and provider configuration.' }, req);
       }
-      if (!status) return json(res, 503, { error: 'Live EskomSePush status unavailable for this location' }, req);
-      return json(res, 200, status, req);
     }
     if (req.method === 'POST' && url.pathname === '/api/auth/login') {
       const input = await body(req);
       if (!hasFields(input, ['email', 'password'])) return json(res, 400, { error: 'email and password are required' }, req);
-      const result = await query('SELECT id, full_name, email, phone, role, municipality, department FROM app_users WHERE lower(email) = lower($1) AND password_hash = crypt($2, password_hash) AND is_active = true LIMIT 1', [input.email, input.password]);
+      const result = await query('SELECT id, full_name, email, role, municipality, department FROM app_users WHERE lower(email) = lower($1) AND password_hash = crypt($2, password_hash) AND is_active = true LIMIT 1', [input.email, input.password]);
       const account = result.rows[0];
       if (!account) return json(res, 401, { error: 'Invalid email or password' }, req);
-      // Multi-factor authentication has been disabled for this deployment, so a
-      // correct email and password signs staff and admin users straight in.
+      // The password is only the first factor. Staff/admin accounts must also
+      // prove control of their email inbox before any dashboard token is issued.
+      if (firebaseEnabled && (account.role === 'staff' || account.role === 'admin')) {
+        if (!firebaseProjectId) return json(res, 503, { error: 'Firebase MFA is enabled but FIREBASE_PROJECT_ID is not configured' }, req);
+        return json(res, 200, {
+          mfaRequired: 'firebase-email',
+          firebase: { projectId: firebaseProjectId },
+          mfaToken: signToken({
+            sub: account.id,
+            role: account.role,
+            email: account.email,
+            purpose: 'firebase-email-mfa',
+            exp: Math.floor(Date.now() / 1000) + 10 * 60
+          }),
+          user: { email: account.email, role: account.role }
+        }, req);
+      }
+      const token = signToken({ sub: account.id, role: account.role, email: account.email, municipality: account.municipality, exp: Math.floor(Date.now() / 1000) + tokenTtlSeconds });
+      await query('UPDATE app_users SET last_seen_at = now() WHERE id = $1', [account.id]);
+      return json(res, 200, { token, expiresIn: tokenTtlSeconds, user: { id: account.id, fullName: account.full_name, email: account.email, role: account.role, municipality: account.municipality, department: account.department } }, req);
+    }
+    // Email-link MFA callback: verify the Firebase ID token and require a
+    // verified Firebase email that matches the account whose password was used.
+    if (req.method === 'POST' && url.pathname === '/api/auth/firebase-email-verify') {
+      if (!firebaseEnabled) return json(res, 404, { error: 'Firebase MFA is not enabled' }, req);
+      const input = await body(req);
+      if (!hasFields(input, ['email', 'idToken', 'mfaToken'])) return json(res, 400, { error: 'email, idToken, and mfaToken are required' }, req);
+      const challenge = verifyToken(input.mfaToken);
+      if (!challenge || challenge.purpose !== 'firebase-email-mfa' ||
+          typeof challenge.sub !== 'string' ||
+          typeof challenge.email !== 'string' ||
+          !['staff', 'admin'].includes(challenge.role) ||
+          challenge.email.toLowerCase() !== input.email.trim().toLowerCase()) {
+        return json(res, 401, { error: 'Password verification has expired or is invalid. Sign in again.' }, req);
+      }
+      let claims;
+      try {
+        claims = await verifyFirebaseIdToken(input.idToken);
+      } catch (error) {
+        return json(res, 401, { error: `Firebase verification failed: ${error.message}` }, req);
+      }
+      const result = await query('SELECT id, full_name, email, role, municipality, department FROM app_users WHERE id = $1 AND lower(email) = lower($2) AND is_active = true LIMIT 1', [challenge.sub, input.email]);
+      const account = result.rows[0];
+      if (!account || account.role !== challenge.role) return json(res, 403, { error: 'Account is not authorised for dashboard access' }, req);
+      if (typeof claims.email !== 'string' ||
+          claims.email.toLowerCase() !== account.email.toLowerCase() ||
+          claims.email.toLowerCase() !== input.email.trim().toLowerCase() ||
+          claims.email_verified !== true) {
+        return json(res, 403, { error: 'Firebase email must be verified and match this dashboard account' }, req);
+      }
       const token = signToken({ sub: account.id, role: account.role, email: account.email, municipality: account.municipality, exp: Math.floor(Date.now() / 1000) + tokenTtlSeconds });
       await query('UPDATE app_users SET last_seen_at = now() WHERE id = $1', [account.id]);
       return json(res, 200, { token, expiresIn: tokenTtlSeconds, user: { id: account.id, fullName: account.full_name, email: account.email, role: account.role, municipality: account.municipality, department: account.department } }, req);
@@ -252,10 +413,31 @@ const server = http.createServer(async (req, res) => {
       const admin = requireRole(req, url, ['admin']);
       if (!admin) return json(res, 403, { error: 'Administrator access required' }, req);
       const input = await body(req);
-      if (!hasFields(input, ['fullName', 'email', 'password', 'municipality'])) return json(res, 400, { error: 'fullName, email, password, and municipality are required' }, req);
+      if (!hasFields(input, ['fullName', 'email', 'password', 'municipality', 'phone'])) return json(res, 400, { error: 'fullName, email, password, municipality, and phone are required' }, req);
       if (input.password.length < 12) return json(res, 400, { error: 'Staff password must be at least 12 characters' }, req);
-      const result = await query(`INSERT INTO app_users (full_name, email, password_hash, role, municipality, department, phone) VALUES ($1, $2, crypt($3, gen_salt('bf')), 'staff', $4, $5, $6) RETURNING id, full_name, email, role, municipality, department, phone`, [input.fullName, input.email, input.password, input.municipality, input.department || null, input.phone || null]);
+      if (!/^\+[1-9]\d{7,14}$/.test(input.phone.trim())) return json(res, 400, { error: 'Staff phone must be in international E.164 format, e.g. +27821234567' }, req);
+      const result = await query(`INSERT INTO app_users (full_name, email, password_hash, role, municipality, department, phone) VALUES ($1, $2, crypt($3, gen_salt('bf')), 'staff', $4, $5, $6) RETURNING id, full_name, email, role, municipality, department, phone`, [input.fullName, input.email, input.password, input.municipality, input.department || null, input.phone.trim()]);
       return json(res, 201, result.rows[0], req);
+    }
+
+    if (req.method === 'PATCH' && url.pathname === '/api/staff/phone') {
+      const admin = requireRole(req, url, ['admin']);
+      if (!admin) return json(res, 403, { error: 'Administrator access required' }, req);
+      const input = await body(req);
+      if (!hasFields(input, ['email', 'phone'])) return json(res, 400, { error: 'Staff email and phone are required' }, req);
+      const phone = input.phone.trim();
+      if (!/^\+[1-9]\d{7,14}$/.test(phone)) {
+        return json(res, 400, { error: 'Phone must be in international E.164 format, e.g. +27821234567' }, req);
+      }
+      const result = await query(
+        `UPDATE app_users
+            SET phone = $1, updated_at = now()
+          WHERE lower(email) = lower($2) AND role = 'staff'
+          RETURNING id, full_name, email, phone`,
+        [phone, input.email.trim()]
+      );
+      if (!result.rows[0]) return json(res, 404, { error: 'Staff account not found' }, req);
+      return json(res, 200, { ...result.rows[0], phoneUpdated: true }, req);
     }
 
     // Password reset. There is no self-service reset mail, so an administrator sets a new

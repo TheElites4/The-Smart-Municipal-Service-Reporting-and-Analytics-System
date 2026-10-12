@@ -82,13 +82,7 @@
     <string name="wc_police">Police</string>
     <string name="wc_fire">Fire</string>
     <string name="wc_medical">Medical</string>
-    <string name="wc_category_water">Water &amp; Sanitation</string>
-    <string name="wc_category_electricity">Electricity</string>
-    <string name="wc_category_roads">Roads &amp; Potholes</string>
     <string name="wc_category_streetlights">Street Lighting</string>
-    <string name="wc_category_waste">Waste Management</string>
-    <string name="wc_category_parks">Parks &amp; Recreation</string>
-    <string name="wc_category_other">Other</string>
     <string name="wc_load_shedding_status">Load-shedding status</string>
     <string name="wc_load_shedding_waiting">Waiting for your location</string>
     <string name="wc_load_shedding_none">No active load shedding reported</string>

@@ -1,22 +1,22 @@
-error: invalid input syntax for type uuid: "RPT-1790615162967"
+error: duplicate key value violates unique constraint "app_users_external_ref_key"
     at C:\Users\Mhlengie Prince\Documents\GitHub\The-Smart-Municipal-Service-Reporting-and-Analytics-System\backend\node_modules\pg-pool\index.js:45:11
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
-    at async Server.<anonymous> (file:///C:/Users/Mhlengie%20Prince/Documents/GitHub/The-Smart-Municipal-Service-Reporting-and-Analytics-System/backend/src/server.js:276:22) {
-  length: 149,
+    at async Server.<anonymous> (file:///C:/Users/Mhlengie%20Prince/Documents/GitHub/The-Smart-Municipal-Service-Reporting-and-Analytics-System/backend/src/server.js:343:22) {
+  length: 261,
   severity: 'ERROR',
-  code: '22P02',
-  detail: undefined,
+  code: '23505',
+  detail: 'Key (external_ref)=(570cd496-23c8-4d8d-a461-f458097233ef) already exists.',
   hint: undefined,
   position: undefined,
   internalPosition: undefined,
   internalQuery: undefined,
-  where: "unnamed portal parameter $1 = '...'",
-  schema: undefined,
-  table: undefined,
+  where: undefined,
+  schema: 'public',
+  table: 'app_users',
   column: undefined,
   dataType: undefined,
-  constraint: undefined,
-  file: 'uuid.c',
-  line: '136',
-  routine: 'string_to_uuid'
+  constraint: 'app_users_external_ref_key',
+  file: 'nbtinsert.c',
+  line: '673',
+  routine: '_bt_check_unique'
 }

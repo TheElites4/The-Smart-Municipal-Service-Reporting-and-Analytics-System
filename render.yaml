@@ -1,0 +1,35 @@
+databases:
+  - name: mzansi-connect-db
+    databaseName: mzansi_connect
+    user: mzansi_connect
+    plan: free
+    region: frankfurt
+    postgresMajorVersion: "16"
+
+services:
+  - type: web
+    name: mzansi-connect-api
+    runtime: node
+    plan: free
+    region: frankfurt
+    rootDir: backend
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mzansi-connect-db
+          property: connectionString
+      - key: MFA_PROVIDER
+        value: firebase
+      - key: FIREBASE_PROJECT_ID
+        value: mzansireport-e01b4
+      - key: ESKOM_SE_PUSH_TOKEN
+        sync: false
+      - key: ALLOWED_ORIGINS
+        value: https://theelites4.github.io,https://mzansireport-e01b4.web.app,https://mzansireport-e01b4.firebaseapp.com

@@ -23,9 +23,12 @@ server-sent event. Staff and admin clients reload from `GET /api/dashboard`;
 citizen clients reload by stable external reference. Android stores a local
 mirror only after the API confirms a report. The API owns the SLA deadline.
 
-Staff/admin login is password plus a one-time code delivered by configured
-Resend email or Twilio SMS. Codes are hashed and expire after ten minutes.
-Provider credentials and reachable account contacts are required for delivery.
+Staff/admin login is password plus **Google Firebase email-link verification**.
+Only those dashboards use this MFA flow; citizen sign-in and Android push
+notifications remain separate. The Firebase Web app config is in
+`firebase-config.js`, and the API checks the verified email against the
+staff/admin account and its short-lived password challenge before issuing a
+dashboard token.
 
 ## Verification
 
@@ -46,8 +49,8 @@ for its syntax gate.
 
 ## Start the local system
 
-For Windows instructions to initialize PostgreSQL, configure real staff/admin
-email or SMS MFA, start each app, and build the Android client, see
+For Windows instructions to initialize PostgreSQL, configure Firebase MFA for
+staff/admin dashboards, start each app, and build the Android client, see
 [DEPLOYMENT.md](DEPLOYMENT.md). The guide uses PowerShell, Node.js, PostgreSQL,
 and Docker commands directly; no AI tools are required.
 
@@ -58,9 +61,6 @@ The default local addresses are:
 - Admin dashboard: `http://localhost:8080/Admin%20Dashboard/`
 - API health: `http://localhost:8787/health`
 
-Email/SMS MFA needs valid provider credentials and reachable staff/admin contact
- details. For temporary Resend testing without a domain, run
-`backend/configure-mfa.ps1`, choose `resend`, and use the Resend-account email
-for the admin recipient; the script sets `onboarding@resend.dev`. The web and
-Android apps connect to the backend and never contain provider secrets. The
-seeded example addresses are placeholders and cannot receive codes.
+Firebase Email/Password email-link sign-in must be enabled in the Firebase console, and
+each staff/admin account needs a reachable registered phone number. The web
+and Android citizen apps do not use the dashboard MFA flow.

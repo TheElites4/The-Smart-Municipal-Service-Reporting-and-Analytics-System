@@ -1,4 +1,4 @@
-const API = localStorage.getItem('mzansiApiUrl') || 'http://localhost:8787';
+const API = localStorage.getItem('mzansiApiUrl') || (['localhost', '127.0.0.1'].includes(location.hostname) ? 'http://localhost:8787' : window.MZANSI_API_URL || 'http://localhost:8787');
 const $ = (id) => document.getElementById(id);
 const tokenKey = 'mzansiStaffToken';
 let liveConnection;
@@ -34,14 +34,172 @@ async function login(event) {
   try {
     const response = await fetch(`${API}/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: $('login-email').value, password: $('login-password').value }) });
     const result = await response.json();
+    // The password is the first factor; an email link proves inbox access.
+    if (response.ok && result.mfaRequired === 'firebase-email') {
+      await beginFirebaseEmailMfa(result.user.email, result.mfaToken, event.target);
+      return;
+    }
     if (!response.ok || result.user?.role !== 'staff') { $('auth-error').textContent = response.ok ? 'This account is not authorised for staff operations.' : (result.error || 'Sign in failed.'); return; }
-    localStorage.setItem(tokenKey, result.token); $('auth-screen').hidden = true; $('app-shell').hidden = false; await load(); connectLive(); loadLoadShedding();
-    toast(`Signed in as ${result.user.fullName || 'staff'}`);
-  } catch {
-    $('auth-error').textContent = 'Network error — is the API running?';
+    completeLogin(result);
+  } catch (error) {
+    $('auth-error').textContent = error instanceof TypeError
+      ? 'Network error — is the API running?'
+      : (error?.message || 'Could not start email verification.');
   } finally {
     button.disabled = false;
   }
+}
+
+// --- Firebase email-link MFA (second factor) -------------------------------
+let firebaseAuth;
+let pendingMfaEmail;
+let pendingMfaToken;
+const pendingEmailKey = `${tokenKey}:pendingEmail`;
+const pendingMfaTokenKey = `${tokenKey}:pendingMfaToken`;
+
+function firebaseMfaAvailable() {
+  return window.MZANSI_FIREBASE_READY && window.firebase && window.MZANSI_FIREBASE_CONFIG?.projectId;
+}
+
+function firebaseEmailError(error) {
+  switch (error?.code) {
+    case 'auth/unauthorized-domain':
+      return 'This dashboard domain is not authorized for Firebase Authentication. Add it under Firebase Authentication settings.';
+    case 'auth/operation-not-allowed':
+      return 'Firebase email-link sign-in is disabled. Enable Email/Password and email-link sign-in in Firebase Authentication.';
+    case 'auth/too-many-requests':
+      return 'Firebase temporarily limited verification emails. Wait before requesting another link.';
+    case 'auth/quota-exceeded':
+      return 'The Firebase email quota has been reached. Check the project limits.';
+    case 'auth/invalid-action-code':
+    case 'auth/expired-action-code':
+      return 'This verification link has expired or was already used. Sign in again to request a new link.';
+    case 'auth/invalid-email':
+      return 'Firebase rejected the account email address. Check the email on the dashboard account.';
+    default:
+      return error?.message || 'Could not send or verify the email link.';
+  }
+}
+
+async function beginFirebaseEmailMfa(email, mfaToken, loginForm) {
+  if (!firebaseMfaAvailable()) {
+    throw new Error('Firebase web configuration is incomplete. Check firebase-config.js.');
+  }
+  if (typeof mfaToken !== 'string' || !mfaToken) {
+    throw new Error('Password verification expired. Sign in again to request a new email link.');
+  }
+  pendingMfaEmail = email;
+  pendingMfaToken = mfaToken;
+  if (!firebaseAuth) firebaseAuth = firebase.auth();
+  sessionStorage.setItem(pendingEmailKey, email);
+  sessionStorage.setItem(pendingMfaTokenKey, mfaToken);
+  $('mfa-email').value = email;
+  $('mfa-email').readOnly = true;
+  loginForm.hidden = true;
+  $('mfa-form').hidden = false;
+  $('mfa-error').textContent = '';
+  $('mfa-form').querySelector('.mfa-hint').textContent = `We’ll email a secure sign-in link to ${email}. Open it in this browser to finish signing in.`;
+  await sendFirebaseEmailLink();
+}
+
+async function sendFirebaseEmailLink() {
+  const email = pendingMfaEmail || $('mfa-email').value.trim();
+  if (!email) { $('mfa-error').textContent = 'Enter the account email address.'; return; }
+  if (!firebaseAuth) firebaseAuth = firebase.auth();
+  const send = $('mfa-send');
+  send.disabled = true;
+  $('mfa-error').textContent = '';
+  try {
+    firebaseAuth.languageCode = 'en';
+    const returnUrl = new URL(location.pathname, location.origin);
+    returnUrl.searchParams.set('mfaToken', pendingMfaToken);
+    await firebaseAuth.sendSignInLinkToEmail(email, {
+      url: returnUrl.href,
+      handleCodeInApp: true,
+    });
+    pendingMfaEmail = email;
+    sessionStorage.setItem(pendingEmailKey, email);
+    $('mfa-email').value = email;
+    $('mfa-email').readOnly = true;
+    send.textContent = 'Resend email link';
+    $('mfa-form').querySelector('.mfa-hint').textContent = `Verification link sent to ${email}. Check your inbox and spam folder, then open it in this browser.`;
+  } catch (error) {
+    $('mfa-error').textContent = firebaseEmailError(error);
+  } finally {
+    send.disabled = false;
+  }
+}
+
+async function completeFirebaseEmailLink(email) {
+  if (!firebaseAuth) firebaseAuth = firebase.auth();
+  const mfaToken = pendingMfaToken || getMfaTokenFromLink();
+  if (!mfaToken) {
+    $('mfa-error').textContent = 'Password verification expired. Go back and sign in again before opening a new email link.';
+    return;
+  }
+  const button = $('mfa-send');
+  button.disabled = true;
+  $('mfa-error').textContent = '';
+  try {
+    const credential = await firebaseAuth.signInWithEmailLink(email, location.href);
+    const idToken = await credential.user.getIdToken();
+    const response = await fetch(`${API}/api/auth/firebase-email-verify`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email, idToken, mfaToken }),
+    });
+    const result = await response.json();
+    if (!response.ok || result.user?.role !== 'staff') {
+      $('mfa-error').textContent = result.error || 'Email verification failed.';
+      return;
+    }
+    sessionStorage.removeItem(pendingEmailKey);
+    sessionStorage.removeItem(pendingMfaTokenKey);
+    pendingMfaToken = null;
+    await firebaseAuth.signOut();
+    history.replaceState({}, document.title, `${location.pathname}${location.hash}`);
+    completeLogin(result);
+  } catch (error) {
+    $('mfa-error').textContent = firebaseEmailError(error);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function getMfaTokenFromLink() {
+  try {
+    const params = new URL(location.href).searchParams;
+    const directToken = params.get('mfaToken');
+    if (directToken) return directToken;
+    const continueUrl = params.get('continueUrl');
+    return continueUrl ? new URL(continueUrl).searchParams.get('mfaToken') : null;
+  } catch {
+    return null;
+  }
+}
+
+async function handleFirebaseEmailLink() {
+  if (!firebaseMfaAvailable() || !firebase.auth().isSignInWithEmailLink(location.href)) return;
+  firebaseAuth = firebase.auth();
+  const storedEmail = sessionStorage.getItem(pendingEmailKey);
+  pendingMfaToken = sessionStorage.getItem(pendingMfaTokenKey) || getMfaTokenFromLink();
+  $('login-form').hidden = true;
+  $('mfa-form').hidden = false;
+  $('mfa-email').value = storedEmail || '';
+  $('mfa-email').readOnly = Boolean(storedEmail);
+  $('mfa-form').querySelector('.mfa-hint').textContent = storedEmail
+    ? 'Verifying your email sign-in link…'
+    : 'Enter the same account email that received this link.';
+  if (storedEmail) await completeFirebaseEmailLink(storedEmail);
+}
+
+function completeLogin(result) {
+  localStorage.setItem(tokenKey, result.token);
+  $('auth-screen').hidden = true;
+  $('app-shell').hidden = false;
+  Promise.resolve(load()).then(connectLive).catch(() => {});
+  loadLoadShedding();
+  toast(`Signed in as ${result.user.fullName || result.user.email || 'staff'}`);
 }
 
 const statusLabel = (status) => String(status || '').replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -109,8 +267,8 @@ async function loadLoadShedding() {
   if (!detail) return;
   try {
     const response = await fetch(`${API}/api/location/status`);
-    if (!response.ok) throw new Error('unavailable');
     const status = await response.json();
+    if (!response.ok) throw new Error(status.error || `Provider request failed (HTTP ${response.status}).`);
     const stage = Number(status.stage) || 0;
     const areas = Array.isArray(status.areas) && status.areas.length ? ` · ${status.areas.join(', ')}` : '';
     detail.textContent = status.current && stage > 0
@@ -118,14 +276,36 @@ async function loadLoadShedding() {
       : `No active load shedding${areas}`;
     $('loadshedding').classList.toggle('active', Boolean(status.current && stage > 0));
     source.textContent = status.source ? `${status.source}${status.updatedAt ? ` · ${new Date(status.updatedAt).toLocaleTimeString()}` : ''}` : '';
-  } catch {
-    detail.textContent = 'Live provider unavailable';
+  } catch (error) {
+    detail.textContent = error instanceof Error ? error.message : 'Live provider unavailable';
     source.textContent = '';
     $('loadshedding').classList.remove('active');
   }
 }
 
 $('login-form').addEventListener('submit', login);
+
+if ($('mfa-form')) {
+  $('mfa-send').addEventListener('click', () => {
+    if (firebaseMfaAvailable() && firebase.auth().isSignInWithEmailLink(location.href)) {
+      const email = $('mfa-email').value.trim();
+      if (!email) {
+        $('mfa-error').textContent = 'Enter the same account email that received this link.';
+        return;
+      }
+      completeFirebaseEmailLink(email);
+    } else {
+      sendFirebaseEmailLink();
+    }
+  });
+  $('mfa-back').addEventListener('click', () => {
+    sessionStorage.removeItem(pendingEmailKey);
+    pendingMfaEmail = null;
+    $('mfa-form').hidden = true;
+    $('login-form').hidden = false;
+    $('mfa-error').textContent = '';
+  });
+}
 $('refresh').onclick = () => { const button = $('refresh'); button.disabled = true; load().then(() => toast('Queue refreshed')).catch(showError).finally(() => { button.disabled = false; }); };
 $('queue-search').oninput = renderQueue;
 function showError() { $('queue').innerHTML = '<div class="empty">Live queue unavailable. Check the API connection.</div>'; }
@@ -149,5 +329,12 @@ function startPolling() {
   }, 15000);
 }
 
-if (localStorage.getItem(tokenKey)) { $('auth-screen').hidden = true; $('app-shell').hidden = false; load().then(connectLive).catch(showError); loadLoadShedding(); }
+if (firebaseMfaAvailable() && firebase.auth().isSignInWithEmailLink(location.href)) {
+  handleFirebaseEmailLink().catch((error) => { $('mfa-error').textContent = firebaseEmailError(error); });
+} else if (localStorage.getItem(tokenKey)) {
+  $('auth-screen').hidden = true;
+  $('app-shell').hidden = false;
+  load().then(connectLive).catch(showError);
+  loadLoadShedding();
+}
 startPolling();

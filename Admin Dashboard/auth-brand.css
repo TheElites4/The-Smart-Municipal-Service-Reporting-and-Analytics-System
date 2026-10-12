@@ -1,1 +1,6 @@
 .auth-screen{background:linear-gradient(rgba(23,61,60,.78),rgba(23,61,60,.78)),url('../Citizen%20Portal%20Mobile%20App/src/imports/WhatsApp_Image_2026-05-11_at_22.41.20.jpeg') center/cover}.auth-card{background:rgba(255,255,255,.94)}
+/* Firebase MFA (second factor) styling */
+.auth-card .mfa-hint{font-size:.82rem;color:#5f7169;margin:10px 0 0}
+.auth-card .link-button{width:auto!important;margin-top:8px!important;padding:0!important;background:none!important;border:none!important;color:#1f8a72!important;font-weight:700;text-decoration:underline;cursor:pointer}
+.auth-card #mfa-form button[type=submit]{margin-top:18px}
+#mfa-recaptcha{margin-top:8px}

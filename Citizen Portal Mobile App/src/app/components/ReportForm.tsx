@@ -42,7 +42,7 @@ const [errors, setErrors] = useState<Record<string, string>>({});
   useEffect(() => {
     fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8787'}/api/options`)
       .then((response) => response.ok ? response.json() : Promise.reject(new Error('Options unavailable')))
-      .then((options) => setServiceOptions({ categories: options.categories || [], municipalities: options.municipalities || [], issues: options.issues || [] }))
+      .then((options) => setServiceOptions({ categories: options.categories || [], municipalities: [...new Set(options.municipalities || [])], issues: options.issues || [] }))
       .catch(() => setOptionsUnavailable(true));
   }, []);
 

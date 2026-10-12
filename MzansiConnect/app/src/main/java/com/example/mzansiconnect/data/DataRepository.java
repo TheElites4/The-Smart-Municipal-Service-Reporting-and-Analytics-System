@@ -4,21 +4,34 @@ import android.content.Context;
 import android.util.Log;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.SetOptions;
+import com.example.mzansiconnect.util.Gamification;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
 import java.util.UUID;
+import android.os.Handler;
+import android.os.Looper;
 
-/**
- * PRODUCTION READY - TRIPLE DATABASE REPOSITORY
- * This class orchestrates data between Local SQL (Room) and Cloud sources
- * (Firebase Auth, Firestore, Realtime Database, Cloud Messaging).
- */
+/** Coordinates PostgreSQL-backed report operations, the Room display cache, and optional Firebase services. */
 public class DataRepository {
+    public interface ReportSubmissionCallback {
+        void onSuccess(Map<String, Object> report);
+        void onFailure(String message);
+    }
+    public interface ReportsRefreshCallback {
+        void onSuccess(List<Report> reports);
+        void onFailure(String message);
+    }
+
     public interface RegistrationCallback {
         void onSuccess();
         void onFailure(String message);
@@ -72,48 +85,6 @@ public class DataRepository {
         }
     }
 
-    public void submitReport(Report report) {
-        // 1. SAVE TO LOCAL SQL
-        executor.execute(() -> sqlDb.appDao().submitReport(report));
-
-        // 2. SYNC TO CLOUD FEED (Firebase Realtime Database & Firestore)
-        FirebaseManager fm = FirebaseManager.getInstance();
-        if (fm.getFirestore() != null) {
-            fm.getFirestore().collection("reports").add(report);
-        }
-        if (fm.getDatabase() != null) {
-            fm.getDatabase().getReference("live_feed").push().setValue(report);
-        }
-
-        FirebaseUser firebaseUser = fm.getCurrentUser();
-        {
-            Map<String, Object> payload = new HashMap<>();
-            String anonymousRef = context.getSharedPreferences("mzansi_client", Context.MODE_PRIVATE).getString("externalRef", null);
-            if (anonymousRef == null) {
-                anonymousRef = UUID.randomUUID().toString();
-                context.getSharedPreferences("mzansi_client", Context.MODE_PRIVATE).edit().putString("externalRef", anonymousRef).apply();
-            }
-            payload.put("externalRef", firebaseUser == null ? anonymousRef : firebaseUser.getUid());
-            payload.put("category", report.category);
-            payload.put("description", report.description);
-            payload.put("location", report.location);
-            payload.put("municipality", report.municipality);
-            payload.put("urgency", report.urgency == null ? "medium" : report.urgency.toLowerCase());
-            SharedApi.service().submitReport(payload).enqueue(new Callback<Map<String, Object>>() {
-                @Override
-                public void onResponse(Call<Map<String, Object>> call, Response<Map<String, Object>> response) {
-                    if (!response.isSuccessful()) Log.e("DataRepo", "Shared API report sync failed: " + response.code());
-                }
-
-                @Override
-                public void onFailure(Call<Map<String, Object>> call, Throwable throwable) {
-                    Log.e("DataRepo", "Shared API report sync unavailable", throwable);
-                }
-            });
-        }
-        Log.d("MzansiReport", "Report saved to Room and queued for Firebase plus shared API synchronization.");
-    }
-
     public void syncFcmTokenToFirebase() {
         FirebaseManager fm = FirebaseManager.getInstance();
         FirebaseUser currentUser = fm.getCurrentUser();
@@ -142,10 +113,7 @@ public class DataRepository {
         });
     }
 
-    /**
-     * Web parity: returns the citizen's stable external reference, creating one on first use
-     * (mirrors `crypto.randomUUID()` stored in web `localStorage.user.externalRef`).
-     */
+    /** Returns the stable citizen reference shared with the PostgreSQL API. */
     public String getOrCreateExternalRef() {
         android.content.SharedPreferences prefs =
                 context.getSharedPreferences("mzansi_client", Context.MODE_PRIVATE);
@@ -157,68 +125,119 @@ public class DataRepository {
         return ref;
     }
 
-    /**
-     * Web parity (`App.tsx` handleSubmitReport): ensure a citizen identity exists on the
-     * shared API, then POST the report to /api/reports as well as /api/mobile/reports.
-     * Failures are non-fatal - the report stays queued in Room.
-     */
-    public void submitReportWebParity(Report report) {
-        executor.execute(() -> sqlDb.appDao().submitReport(report));
-
+    /** Submit once to the database-backed API; never report success for a local-only copy. */
+    public void submitReport(Report report, Map<String, Object> photo, ReportSubmissionCallback callback) {
         final String externalRef = getOrCreateExternalRef();
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("externalRef", externalRef);
+        payload.put("category", report.category);
+        payload.put("description", report.description);
+        payload.put("location", report.location);
+        payload.put("municipality", report.municipality);
+        if (report.latitude != null && report.longitude != null) {
+            payload.put("latitude", report.latitude);
+            payload.put("longitude", report.longitude);
+        }
+        payload.put("urgency", report.urgency == null ? "medium" : report.urgency.toLowerCase());
+        payload.put("status", "submitted");
+        if (photo != null) payload.put("photo", photo);
+        SharedApi.service().createReport(payload).enqueue(new Callback<Map<String, Object>>() {
+            @Override
+            public void onResponse(Call<Map<String, Object>> call, Response<Map<String, Object>> response) {
+                if (!response.isSuccessful() || response.body() == null) {
+                    callback.onFailure("The server rejected this report (HTTP " + response.code() + "). It was not submitted.");
+                    return;
+                }
+                Map<String, Object> saved = response.body();
+                report.remoteId = String.valueOf(saved.get("id"));
+                report.publicReference = String.valueOf(saved.get("public_reference"));
+                report.status = String.valueOf(saved.get("status"));
+                report.hasPhoto = Boolean.TRUE.equals(saved.get("has_photo"));
+                Object createdAt = saved.get("created_at");
+                if (createdAt != null) report.timestamp = parseTimestamp(String.valueOf(createdAt));
+                Object slaDueAt = saved.get("sla_due_at");
+                if (slaDueAt != null) report.slaDueAt = parseTimestamp(String.valueOf(slaDueAt));
+                executor.execute(() -> {
+                    sqlDb.appDao().submitReport(report);
+                    new Handler(Looper.getMainLooper()).post(() -> callback.onSuccess(saved));
+                });
+            }
+
+            @Override
+            public void onFailure(Call<Map<String, Object>> call, Throwable throwable) {
+                Log.e("DataRepo", "Report submission failed", throwable);
+                callback.onFailure("Could not reach the service. Check your connection and try again.");
+            }
+        });
+    }
+
+    public void refreshCitizenReports(ReportsRefreshCallback callback) {
+        String externalRef = getOrCreateExternalRef();
         Map<String, Object> identity = new HashMap<>();
         identity.put("externalRef", externalRef);
         SharedApi.service().resolveAnonymous(identity).enqueue(new Callback<Map<String, Object>>() {
             @Override
             public void onResponse(Call<Map<String, Object>> call, Response<Map<String, Object>> response) {
-                String citizenId = response.isSuccessful() && response.body() != null
-                        ? String.valueOf(response.body().get("id")) : null;
-                postCitizenReport(report, citizenId);
-            }
-
-            @Override
-            public void onFailure(Call<Map<String, Object>> call, Throwable throwable) {
-                Log.e("DataRepo", "Anonymous identity sync unavailable", throwable);
-                postCitizenReport(report, null);
-            }
-        });
-
-        // Also mirror to cloud so the existing Firebase pipeline keeps working.
-        syncReportToCloud(report);
-    }
-
-    private void postCitizenReport(Report report, String citizenId) {
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("citizenId", citizenId);
-        payload.put("category", report.category);
-        payload.put("description", report.description);
-        payload.put("location", report.location);
-        payload.put("municipality", report.municipality);
-        payload.put("urgency", report.urgency == null ? "medium" : report.urgency.toLowerCase());
-        payload.put("status", "submitted");
-        SharedApi.service().createReport(payload).enqueue(new Callback<Map<String, Object>>() {
-            @Override
-            public void onResponse(Call<Map<String, Object>> call, Response<Map<String, Object>> response) {
-                if (!response.isSuccessful()) {
-                    Log.e("DataRepo", "Shared API report sync failed: " + response.code());
+                if (!response.isSuccessful() || response.body() == null || response.body().get("id") == null) {
+                    callback.onFailure("Citizen account is unavailable from the service.");
+                    return;
                 }
+                SharedApi.service().getReports(externalRef).enqueue(new Callback<List<Map<String, Object>>>() {
+                    @Override
+                    public void onResponse(Call<List<Map<String, Object>>> call, Response<List<Map<String, Object>>> reportsResponse) {
+                        if (!reportsResponse.isSuccessful() || reportsResponse.body() == null) {
+                            callback.onFailure("Reports could not be loaded from the service.");
+                            return;
+                        }
+                        List<Report> reports = new ArrayList<>();
+                        for (Map<String, Object> row : reportsResponse.body()) reports.add(toReport(row));
+                        executor.execute(() -> {
+                            sqlDb.appDao().clearReports();
+                            for (Report report : reports) sqlDb.appDao().submitReport(report);
+                            new Handler(Looper.getMainLooper()).post(() -> callback.onSuccess(reports));
+                        });
+                    }
+
+                    @Override
+                    public void onFailure(Call<List<Map<String, Object>>> call, Throwable throwable) {
+                        callback.onFailure("Reports could not be loaded. Check your connection.");
+                    }
+                });
             }
 
             @Override
             public void onFailure(Call<Map<String, Object>> call, Throwable throwable) {
-                Log.e("DataRepo", "Shared API report sync unavailable", throwable);
+                callback.onFailure("Citizen account is unavailable. Check your connection.");
             }
         });
     }
 
-    /** Mirrors a report to Firestore + Realtime Database (shared cloud feed). */
-    private void syncReportToCloud(Report report) {
-        FirebaseManager fm = FirebaseManager.getInstance();
-        if (fm.getFirestore() != null) {
-            fm.getFirestore().collection("reports").add(report);
-        }
-        if (fm.getDatabase() != null) {
-            fm.getDatabase().getReference("live_feed").push().setValue(report);
+    private static Report toReport(Map<String, Object> row) {
+        Report report = new Report();
+        report.remoteId = String.valueOf(row.get("id"));
+        report.publicReference = String.valueOf(row.get("public_reference"));
+        report.category = String.valueOf(row.get("category"));
+        report.description = String.valueOf(row.get("description"));
+        report.location = String.valueOf(row.get("location_text"));
+        report.municipality = String.valueOf(row.get("municipality"));
+        report.hasPhoto = Boolean.TRUE.equals(row.get("has_photo"));
+        if (row.get("latitude") instanceof Number) report.latitude = ((Number) row.get("latitude")).doubleValue();
+        if (row.get("longitude") instanceof Number) report.longitude = ((Number) row.get("longitude")).doubleValue();
+        report.urgency = String.valueOf(row.get("urgency"));
+        report.status = String.valueOf(row.get("status")).replace('_', '-');
+        report.timestamp = parseTimestamp(String.valueOf(row.get("created_at")));
+        Object slaDueAt = row.get("sla_due_at");
+        if (slaDueAt != null) report.slaDueAt = parseTimestamp(String.valueOf(slaDueAt));
+        report.points = Gamification.POINTS_PER_REPORT;
+        return report;
+    }
+
+    private static long parseTimestamp(String value) {
+        try {
+            Date parsed = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSX", Locale.US).parse(value);
+            return parsed == null ? 0 : parsed.getTime();
+        } catch (java.text.ParseException error) {
+            return 0;
         }
     }
 

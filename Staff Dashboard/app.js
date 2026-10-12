@@ -3,8 +3,10 @@ const $ = (id) => document.getElementById(id);
 const tokenKey = 'mzansiStaffToken';
 let liveConnection;
 let latestReports = [];
+let pollTimer; // fallback refresh so new citizen reports appear even if the live stream drops
+const loginForm = $('login-form');
 const authHeaders = (json = false) => ({ ...(json ? { 'content-type': 'application/json' } : {}), authorization: `Bearer ${localStorage.getItem(tokenKey) || ''}` });
-const logout = () => { localStorage.removeItem(tokenKey); if (liveConnection) liveConnection.close(); $('app-shell').hidden = true; $('auth-screen').hidden = false; };
+const logout = () => { localStorage.removeItem(tokenKey); if (liveConnection) liveConnection.close(); $('app-shell').hidden = true; $('auth-screen').hidden = false; loginForm.hidden = false; };
 
 // Icons + toast helper (no external dependencies).
 const icons = {
@@ -33,7 +35,7 @@ async function login(event) {
     const response = await fetch(`${API}/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: $('login-email').value, password: $('login-password').value }) });
     const result = await response.json();
     if (!response.ok || result.user?.role !== 'staff') { $('auth-error').textContent = response.ok ? 'This account is not authorised for staff operations.' : (result.error || 'Sign in failed.'); return; }
-    localStorage.setItem(tokenKey, result.token); $('auth-screen').hidden = true; $('app-shell').hidden = false; await load(); connectLive();
+    localStorage.setItem(tokenKey, result.token); $('auth-screen').hidden = true; $('app-shell').hidden = false; await load(); connectLive(); loadLoadShedding();
     toast(`Signed in as ${result.user.fullName || 'staff'}`);
   } catch {
     $('auth-error').textContent = 'Network error — is the API running?';
@@ -84,8 +86,7 @@ function renderQueue() {
 }
 
 async function load() {
-  const municipality = $('municipality').value.trim();
-  const response = await fetch(`${API}/api/dashboard${municipality ? `?municipality=${encodeURIComponent(municipality)}` : ''}`, { headers: authHeaders() });
+  const response = await fetch(`${API}/api/dashboard`, { headers: authHeaders() });
   if (response.status === 401 || response.status === 403) return logout();
   if (!response.ok) throw new Error('Dashboard data unavailable');
   const data = await response.json();
@@ -100,9 +101,32 @@ async function load() {
   renderQueue();
 }
 
+// Live load-shedding provider, mirroring the Android dashboard banner
+// (DashboardFragment.loadLoadSheddingStatus -> GET /api/location/status).
+async function loadLoadShedding() {
+  const detail = $('loadshedding-detail');
+  const source = $('loadshedding-source');
+  if (!detail) return;
+  try {
+    const response = await fetch(`${API}/api/location/status`);
+    if (!response.ok) throw new Error('unavailable');
+    const status = await response.json();
+    const stage = Number(status.stage) || 0;
+    const areas = Array.isArray(status.areas) && status.areas.length ? ` · ${status.areas.join(', ')}` : '';
+    detail.textContent = status.current && stage > 0
+      ? `Stage ${stage} active${areas}`
+      : `No active load shedding${areas}`;
+    $('loadshedding').classList.toggle('active', Boolean(status.current && stage > 0));
+    source.textContent = status.source ? `${status.source}${status.updatedAt ? ` · ${new Date(status.updatedAt).toLocaleTimeString()}` : ''}` : '';
+  } catch {
+    detail.textContent = 'Live provider unavailable';
+    source.textContent = '';
+    $('loadshedding').classList.remove('active');
+  }
+}
+
 $('login-form').addEventListener('submit', login);
 $('refresh').onclick = () => { const button = $('refresh'); button.disabled = true; load().then(() => toast('Queue refreshed')).catch(showError).finally(() => { button.disabled = false; }); };
-$('municipality').onchange = () => load().catch(showError);
 $('queue-search').oninput = renderQueue;
 function showError() { $('queue').innerHTML = '<div class="empty">Live queue unavailable. Check the API connection.</div>'; }
 
@@ -113,4 +137,17 @@ function connectLive() {
   ['report.created', 'report.updated'].forEach((eventName) => liveConnection.addEventListener(eventName, () => load().catch(showError)));
   liveConnection.onerror = () => { $('live-status').textContent = 'Reconnecting'; liveConnection.close(); setTimeout(connectLive, 5000); };
 }
-if (localStorage.getItem(tokenKey)) { $('auth-screen').hidden = true; $('app-shell').hidden = false; load().then(connectLive).catch(showError); }
+
+// Keep the queue in sync with citizen submissions at all times, exactly like the
+// admin dashboard, even when the event stream is slow or unavailable.
+function startPolling() {
+  if (pollTimer) return;
+  pollTimer = setInterval(() => {
+    if (!localStorage.getItem(tokenKey) || document.hidden) return;
+    load().catch(() => {});
+    loadLoadShedding();
+  }, 15000);
+}
+
+if (localStorage.getItem(tokenKey)) { $('auth-screen').hidden = true; $('app-shell').hidden = false; load().then(connectLive).catch(showError); loadLoadShedding(); }
+startPolling();

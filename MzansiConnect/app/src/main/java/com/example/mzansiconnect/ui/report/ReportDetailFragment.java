@@ -1,6 +1,7 @@
 package com.example.mzansiconnect.ui.report;
 
 import android.content.Intent;
+import android.graphics.BitmapFactory;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
@@ -10,6 +11,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -23,7 +25,6 @@ import com.example.mzansiconnect.data.Report;
 import com.example.mzansiconnect.data.SharedApi;
 import com.example.mzansiconnect.ui.dashboard.ReportsAdapter;
 import com.example.mzansiconnect.util.Gamification;
-import com.example.mzansiconnect.util.ServiceData;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
@@ -36,14 +37,15 @@ import retrofit2.Response;
 
 /**
  * Mirrors web Citizen Portal ReportDetail.tsx:
- * status pill, info card, SLA countdown, photo gallery, tracking timeline, WhatsApp share.
+ * status pill, report details, SLA countdown, tracking timeline, and WhatsApp share.
  */
 public class ReportDetailFragment extends Fragment {
 
     private TextView referenceTv, statusTv, categoryTv, descriptionTv, locationTv,
-            submittedTv, urgencyTv, slaTitle, slaDetail, aiBanner;
-    private LinearLayout slaCard, photosCard, photosContainer, timelineContainer;
-    private TextView photosTitle, timelineEmpty;
+            submittedTv, urgencyTv, slaTitle, slaDetail;
+    private ImageView photoView;
+    private LinearLayout slaCard, timelineContainer;
+    private TextView timelineEmpty;
     private Report report;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private Runnable slaTicker;
@@ -59,17 +61,14 @@ public class ReportDetailFragment extends Fragment {
         categoryTv = root.findViewById(R.id.detail_category);
         descriptionTv = root.findViewById(R.id.detail_description);
         locationTv = root.findViewById(R.id.detail_location);
+        photoView = root.findViewById(R.id.detail_photo);
         submittedTv = root.findViewById(R.id.detail_submitted);
         urgencyTv = root.findViewById(R.id.detail_urgency);
         slaCard = root.findViewById(R.id.card_sla);
         slaTitle = root.findViewById(R.id.sla_title);
         slaDetail = root.findViewById(R.id.sla_detail);
-        photosCard = root.findViewById(R.id.card_photos);
-        photosContainer = root.findViewById(R.id.photos_container);
-        photosTitle = root.findViewById(R.id.photos_title);
         timelineContainer = root.findViewById(R.id.timeline_container);
         timelineEmpty = root.findViewById(R.id.timeline_empty);
-        aiBanner = root.findViewById(R.id.detail_ai_banner);
 
         root.findViewById(R.id.btn_back_dashboard).setOnClickListener(v ->
                 Navigation.findNavController(v).navigateUp());
@@ -132,27 +131,38 @@ public class ReportDetailFragment extends Fragment {
         statusTv.setTextColor(statusTextColor(status));
         statusTv.setBackground(statusBackground(status));
 
-        if (resolved.aiDetectedCategory != null && !resolved.aiDetectedCategory.isEmpty()) {
-            aiBanner.setVisibility(View.VISIBLE);
-            aiBanner.setText(getString(R.string.wc_ai_detected) + ": " + resolved.aiDetectedCategory);
-        }
-
+        if (resolved.hasPhoto && resolved.remoteId != null) loadPhoto(resolved.remoteId);
         setupSla(resolved);
         renderTimeline(resolved);
         wireActions(resolved, root);
+    }
+
+    private void loadPhoto(String reportId) {
+        String externalRef = com.example.mzansiconnect.data.DataRepository.getInstance(requireContext()).getOrCreateExternalRef();
+        SharedApi.service().getReportPhoto(reportId, externalRef).enqueue(new Callback<okhttp3.ResponseBody>() {
+            @Override public void onResponse(Call<okhttp3.ResponseBody> call, Response<okhttp3.ResponseBody> response) {
+                if (!response.isSuccessful() || response.body() == null || !isAdded()) return;
+                try {
+                    byte[] bytes = response.body().bytes();
+                    photoView.setImageBitmap(BitmapFactory.decodeByteArray(bytes, 0, bytes.length));
+                    photoView.setVisibility(View.VISIBLE);
+                } catch (Exception ignored) { }
+            }
+            @Override public void onFailure(Call<okhttp3.ResponseBody> call, Throwable error) { }
+        });
     }
 
     /* ---------- SLA countdown (web useEffect interval) ---------- */
 
     private void setupSla(Report resolved) {
         String status = ReportsAdapter.normalizeStatus(resolved.status);
-        if ("resolved".equals(status)) {
+        if ("resolved".equals(status) || "closed".equals(status) || resolved.slaDueAt <= 0) {
             slaCard.setVisibility(View.GONE);
             return;
         }
         slaCard.setVisibility(View.VISIBLE);
-        int slaHours = ServiceData.slaHours(resolved.category);
-        long deadline = resolved.timestamp + (long) slaHours * 60 * 60 * 1000;
+        long deadline = resolved.slaDueAt;
+        long slaHours = Math.max(0, (deadline - resolved.timestamp + 3_599_999) / 3_600_000);
 
         slaTicker = new Runnable() {
             @Override

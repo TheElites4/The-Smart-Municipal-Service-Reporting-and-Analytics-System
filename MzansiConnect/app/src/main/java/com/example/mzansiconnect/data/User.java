@@ -8,8 +8,6 @@ public class User {
     @PrimaryKey(autoGenerate = true)
     public int id;
     public String fullName;
-    public String idNumber;
     public String email;
     public String phoneNumber;
-    public String password;
 }

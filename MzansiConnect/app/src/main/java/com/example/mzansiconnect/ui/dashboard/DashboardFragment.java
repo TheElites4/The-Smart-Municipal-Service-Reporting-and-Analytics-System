@@ -15,23 +15,20 @@ import androidx.fragment.app.Fragment;
 import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.RecyclerView;
 import com.example.mzansiconnect.R;
-import com.example.mzansiconnect.data.AppDatabase;
+import com.example.mzansiconnect.data.DataRepository;
 import com.example.mzansiconnect.data.Report;
 import com.example.mzansiconnect.data.SharedApi;
-import com.example.mzansiconnect.ui.status.ServiceStatusRenderer;
 import com.example.mzansiconnect.util.Gamification;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Executors;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
 /**
  * Mirrors web Citizen Portal Dashboard.tsx:
- * nav bar (user), load-shedding banner, hero badge, 3 stat cards,
- * "My Reports" list, embedded Service Status Board + Leaderboard.
+ * Loads the citizen's database reports, summary values, live status, and leaderboard.
  */
 public class DashboardFragment extends Fragment {
 
@@ -42,7 +39,6 @@ public class DashboardFragment extends Fragment {
     private RecyclerView recycler;
     private LinearLayout leaderboardContainer;
     private TextView leaderboardEmpty;
-    private final int currentUserId = 1;
 
     private final ActivityResultLauncher<String[]> locationPermissionLauncher =
             registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), result -> {
@@ -50,6 +46,8 @@ public class DashboardFragment extends Fragment {
                 Boolean coarse = result.get(android.Manifest.permission.ACCESS_COARSE_LOCATION);
                 if (Boolean.TRUE.equals(fine) || Boolean.TRUE.equals(coarse)) {
                     loadLoadSheddingStatus();
+                } else if (loadSheddingDetail != null) {
+                    loadSheddingDetail.setText("Location permission is required for live status.");
                 }
             });
 
@@ -102,15 +100,10 @@ public class DashboardFragment extends Fragment {
                     Navigation.findNavController(v).navigate(R.id.navigation_home));
         }
 
-        // Embedded service status board (web Advanced Sections)
-        ServiceStatusRenderer.bind(root.findViewById(R.id.service_status_container));
-
         refreshHeroBadge();
         loadReports();
         loadLeaderboard();
         loadLoadSheddingStatus();
-        listenForRealtimeReports();
-
         return root;
     }
 
@@ -136,9 +129,9 @@ public class DashboardFragment extends Fragment {
                 if (location != null) {
                     fetchStatusForLocation(location.getLatitude(), location.getLongitude());
                 } else {
-                    fetchStatusForLocation(-26.2041, 28.0473);
+                    loadSheddingDetail.setText("Device location is unavailable.");
                 }
-            }).addOnFailureListener(e -> fetchStatusForLocation(-26.2041, 28.0473));
+            }).addOnFailureListener(e -> loadSheddingDetail.setText("Device location is unavailable."));
         } else {
             locationPermissionLauncher.launch(new String[]{
                     android.Manifest.permission.ACCESS_FINE_LOCATION,
@@ -177,17 +170,17 @@ public class DashboardFragment extends Fragment {
                     if (isCurrent && stage > 0) {
                         loadSheddingDetail.setText("Stage " + stage + " Active · " + areaName);
                     } else {
-                        loadSheddingDetail.setText("No active load shedding · " + areaName);
+                        loadSheddingDetail.setText("Live load-shedding status unavailable.");
                     }
                 } else {
-                    loadSheddingDetail.setText("No active load shedding · " + areaName);
+                    loadSheddingDetail.setText("Live load-shedding status unavailable.");
                 }
             }
 
             @Override
             public void onFailure(Call<Map<String, Object>> call, Throwable throwable) {
                 if (!isAdded() || loadSheddingDetail == null) return;
-                loadSheddingDetail.setText("No active load shedding · " + areaName);
+                loadSheddingDetail.setText("Live load-shedding status unavailable.");
             }
         });
     }
@@ -227,63 +220,34 @@ public class DashboardFragment extends Fragment {
         }
     }
 
-    private com.google.firebase.firestore.ListenerRegistration firestoreListener;
-
-    private void listenForRealtimeReports() {
-        try {
-            com.example.mzansiconnect.data.FirebaseManager fm = com.example.mzansiconnect.data.FirebaseManager.getInstance();
-            if (fm.getFirestore() != null) {
-                firestoreListener = fm.getFirestore().collection("reports")
-                        .addSnapshotListener((snapshots, e) -> {
-                            if (isAdded() && snapshots != null) {
-                                loadReports();
-                            }
-                        });
-            }
-        } catch (Exception e) {
-            // Non-fatal if Firebase isn't configured
-        }
-    }
-
     private void loadReports() {
-        Executors.newSingleThreadExecutor().execute(() -> {
-            if (getContext() == null) return;
-            List<Report> reports = AppDatabase.getInstance(requireContext())
-                    .appDao().getAllReports();
-            int total = reports.size();
-            int inProgress = 0;
-            int resolved = 0;
-            for (Report report : reports) {
-                String status = ReportsAdapter.normalizeStatus(report.status);
-                if ("in-progress".equals(status)) inProgress++;
-                else if ("resolved".equals(status)) resolved++;
+        DataRepository.getInstance(requireContext()).refreshCitizenReports(new DataRepository.ReportsRefreshCallback() {
+            @Override
+            public void onSuccess(List<Report> reports) {
+                if (!isAdded() || statTotal == null) return;
+                int inProgress = 0;
+                int resolved = 0;
+                for (Report report : reports) {
+                    String status = ReportsAdapter.normalizeStatus(report.status);
+                    if ("in-progress".equals(status)) inProgress++;
+                    else if ("resolved".equals(status) || "closed".equals(status)) resolved++;
+                }
+                statTotal.setText(String.valueOf(reports.size()));
+                statPending.setText(String.valueOf(inProgress));
+                statResolved.setText(String.valueOf(resolved));
+                if (adapter != null) adapter.submit(reports);
+                if (reportsEmpty != null) reportsEmpty.setVisibility(reports.isEmpty() ? View.VISIBLE : View.GONE);
+                if (recycler != null) recycler.setVisibility(reports.isEmpty() ? View.GONE : View.VISIBLE);
             }
-            final int fTotal = total, fProgress = inProgress, fResolved = resolved;
-            final List<Report> snapshot = new ArrayList<>(reports);
-            if (isAdded() && getActivity() != null) {
-                getActivity().runOnUiThread(() -> {
-                    if (!isAdded() || statTotal == null) return;
-                    statTotal.setText(String.valueOf(fTotal));
-                    statPending.setText(String.valueOf(fProgress));
-                    statResolved.setText(String.valueOf(fResolved));
-                    if (adapter != null) adapter.submit(snapshot);
-                    if (reportsEmpty != null) {
-                        reportsEmpty.setVisibility(snapshot.isEmpty() ? View.VISIBLE : View.GONE);
-                    }
-                    if (recycler != null) {
-                        recycler.setVisibility(snapshot.isEmpty() ? View.GONE : View.VISIBLE);
-                    }
-                });
+
+            @Override
+            public void onFailure(String message) {
+                if (!isAdded() || reportsEmpty == null) return;
+                reportsEmpty.setText(message);
+                reportsEmpty.setVisibility(View.VISIBLE);
+                if (recycler != null) recycler.setVisibility(View.GONE);
             }
         });
-    }
-
-    @Override
-    public void onDestroyView() {
-        super.onDestroyView();
-        if (firestoreListener != null) {
-            firestoreListener.remove();
-        }
     }
 
     private void loadLeaderboard() {

@@ -22,7 +22,7 @@ public class LoginFragment extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View root = inflater.inflate(R.layout.fragment_login, container, false);
 
-        EditText idEdit = root.findViewById(R.id.login_id);
+        EditText emailEdit = root.findViewById(R.id.login_email);
         EditText passEdit = root.findViewById(R.id.login_pass);
         Button loginBtn = root.findViewById(R.id.btn_login_submit);
         View backBtn = root.findViewById(R.id.btn_login_back);
@@ -30,7 +30,7 @@ public class LoginFragment extends Fragment {
         backBtn.setOnClickListener(v -> Navigation.findNavController(v).navigateUp());
 
         loginBtn.setOnClickListener(v -> {
-            String email = idEdit.getText().toString().trim();
+            String email = emailEdit.getText().toString().trim();
             String pass = passEdit.getText().toString().trim();
 
             if (email.isEmpty() || pass.isEmpty()) {

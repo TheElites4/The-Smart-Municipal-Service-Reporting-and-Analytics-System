@@ -29,7 +29,7 @@
 .auth-card .eyebrow{display:inline-block;margin-top:2px}
 .auth-card p{color:#5f7169;line-height:1.55}
 .auth-card label{display:block;margin-top:18px;color:#12332f;font-weight:700;font-size:.88rem}
-.auth-card input{width:100%;margin-top:8px;border:1px solid #d9e3dd;border-radius:10px;padding:13px 14px;font:inherit;color:#14211f;background:#f8fbf9;transition:border-color .16s ease,box-shadow .16s ease,background .16s ease}
+.auth-card input,.auth-card select{width:100%;margin-top:8px;border:1px solid #d9e3dd;border-radius:10px;padding:13px 14px;font:inherit;color:#14211f;background:#f8fbf9;transition:border-color .16s ease,box-shadow .16s ease,background .16s ease}
 .auth-card input:focus{outline:none;border-color:#1f8a72;background:#fff;box-shadow:0 0 0 4px rgba(31,138,114,.14)}
 .auth-card button{width:100%;margin-top:24px;justify-content:center;padding:13px;font-size:.92rem}
 .auth-error{color:#b43d34!important;min-height:20px;font-size:.88rem;margin:12px 0 0}
@@ -79,6 +79,18 @@ header input:focus { outline: none; border-color: #8ee2d0; background: rgba(255,
 /* ---------- Layout ---------- */
 main { max-width: 1200px; margin: 0 auto; padding: 30px 24px 64px; }
 .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+
+/* ---------- Load-shedding banner (live Eskom provider) ---------- */
+.grid-status { display: flex; align-items: center; gap: 14px; margin-top: 16px; padding: 16px 20px; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-sm); transition: border-color .18s ease, background .18s ease; }
+.grid-status .ls-icon { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 12px; background: #e5f2ec; color: var(--green); flex: none; }
+.grid-status .ls-icon svg { width: 20px; height: 20px; }
+.grid-status .ls-body { flex: 1; min-width: 0; }
+.grid-status .ls-title { font-weight: 700; font-size: .88rem; margin: 0; }
+.grid-status .ls-detail { color: var(--muted); font-size: .82rem; margin: 3px 0 0; }
+.grid-status .ls-source { color: var(--muted); font-size: .74rem; text-align: right; flex: none; max-width: 40%; }
+.grid-status.active { background: #fdf1d8; border-color: #f0cf94; }
+.grid-status.active .ls-icon { background: #f6c651; color: #fff; }
+@media (max-width: 900px) { .grid-status { flex-wrap: wrap; } .grid-status .ls-source { max-width: 100%; text-align: left; } }
 
 /* ---------- Metric cards ---------- */
 .metric, .job { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-sm); }

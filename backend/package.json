@@ -4,7 +4,10 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "check": "node --check src/server.js",
+    "check:deployment": "node scripts/check-deployment.mjs",
+    "import:municipalities": "node scripts/import-municipalities.mjs"
   },
   "dependencies": {
     "pg": "^8.13.1"

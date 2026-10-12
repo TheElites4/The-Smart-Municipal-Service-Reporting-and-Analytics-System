@@ -87,29 +87,6 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
-                    android:text="SA ID Number"
-                    android:textColor="@color/white"
-                    android:textStyle="bold"
-                    android:textSize="13sp" />
-                <EditText
-                    android:id="@+id/reg_id"
-                    android:layout_width="match_parent"
-                    android:layout_height="46dp"
-                    android:layout_marginTop="6dp"
-                    android:background="@drawable/glass_card"
-                    android:backgroundTint="@color/portal_input_bg"
-                    android:hint="13-digit identity number"
-                    android:inputType="number"
-                    android:maxLength="13"
-                    android:paddingHorizontal="16dp"
-                    android:textColor="@color/white"
-                    android:textColorHint="@color/portal_text_secondary"
-                    android:textSize="13sp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
                     android:text="Email Address"
                     android:textColor="@color/white"
                     android:textStyle="bold"

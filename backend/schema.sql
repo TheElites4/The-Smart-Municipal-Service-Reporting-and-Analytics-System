@@ -20,6 +20,22 @@ CREATE TABLE app_users (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE service_categories (
+  name TEXT PRIMARY KEY,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+INSERT INTO service_categories (name) VALUES
+  ('Water & Sanitation'),
+  ('Electricity'),
+  ('Roads & Potholes'),
+  ('Street Lighting'),
+  ('Waste Management'),
+  ('Parks & Recreation'),
+  ('Other')
+ON CONFLICT (name) DO NOTHING;
+
 CREATE TABLE service_reports (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   public_reference TEXT NOT NULL UNIQUE,
@@ -67,10 +83,22 @@ CREATE TABLE audit_events (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE auth_mfa_challenges (
+  challenge_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  code_hash TEXT NOT NULL,
+  delivery_method TEXT NOT NULL CHECK (delivery_method IN ('email', 'sms')),
+  attempts SMALLINT NOT NULL DEFAULT 0 CHECK (attempts BETWEEN 0 AND 5),
+  expires_at TIMESTAMPTZ NOT NULL,
+  consumed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE INDEX service_reports_queue_idx ON service_reports (municipality, status, urgency, created_at DESC);
 CREATE INDEX service_reports_citizen_idx ON service_reports (citizen_id, created_at DESC);
 CREATE INDEX assignments_staff_idx ON report_assignments (staff_id, assigned_at DESC);
 CREATE INDEX users_workforce_idx ON app_users (role, municipality, is_active);
+CREATE INDEX auth_mfa_user_created_idx ON auth_mfa_challenges (user_id, created_at DESC);
 
 CREATE OR REPLACE FUNCTION touch_updated_at() RETURNS TRIGGER AS $$
 BEGIN

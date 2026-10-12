@@ -1,7 +1,14 @@
 [33m[vite:css][postcss] @import must precede all other statements (besides @charset or empty @layer)
-5230|    initial-value: 0;
-5231|  }
-5232|  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap');
+4973|    initial-value: 0;
+4974|  }
+4975|  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap');
    |  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-5233|  :root {
-5234|    --font-size: 16px;[39m
+4976|  :root {
+4977|    --font-size: 16px;[39m
+[33m[vite:css][postcss] @import must precede all other statements (besides @charset or empty @layer)
+5052|    initial-value: 0;
+5053|  }
+5054|  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap');
+   |  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+5055|  :root {
+5056|    --font-size: 16px;[39m

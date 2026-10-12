@@ -33,8 +33,11 @@ public final class SharedApi {
         @POST("api/users/anonymous")
         Call<Map<String, Object>> resolveAnonymous(@Body Map<String, Object> payload);
 
-        @POST("api/mobile/reports")
-        Call<Map<String, Object>> submitReport(@Body Map<String, Object> payload);
+        @GET("api/options")
+        Call<Map<String, Object>> getOptions();
+
+        @GET("api/location/reverse")
+        Call<Map<String, Object>> reverseLocation(@Query("latitude") double latitude, @Query("longitude") double longitude);
 
         /** Web `POST /api/reports` - canonical citizen report creation. */
         @POST("api/reports")
@@ -42,11 +45,14 @@ public final class SharedApi {
 
         /** Web `GET /api/reports?citizenId=` - reports for one citizen. */
         @GET("api/reports")
-        Call<List<Map<String, Object>>> getReports(@Query("citizenId") String citizenId);
+        Call<List<Map<String, Object>>> getReports(@Query("externalRef") String externalRef);
 
         /** Web `GET /api/reports/:id/events` - tracking timeline. */
         @GET("api/reports/{id}/events")
         Call<List<Map<String, Object>>> getReportEvents(@Path("id") String reportId);
+
+        @GET("api/reports/{id}/photo")
+        Call<okhttp3.ResponseBody> getReportPhoto(@Path("id") String reportId, @Query("externalRef") String externalRef);
 
         /** Web `GET /api/leaderboard` - community hero leaderboard. */
         @GET("api/leaderboard")
@@ -58,8 +64,5 @@ public final class SharedApi {
                                                     @Query("longitude") String longitude,
                                                     @Query("municipality") String municipality);
 
-        /** Web `GET /api/loadshedding/schedules` - Eskom live load shedding schedules dataset. */
-        @GET("api/loadshedding/schedules")
-        Call<Map<String, Object>> getLoadSheddingSchedules();
     }
 }

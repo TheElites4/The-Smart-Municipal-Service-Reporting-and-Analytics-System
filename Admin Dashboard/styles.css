@@ -98,6 +98,36 @@ header p { color: #b9cfc9; margin: 10px 0 0; max-width: 46ch; line-height: 1.5; 
 /* ---------- Layout ---------- */
 main { max-width: 1240px; margin: 0 auto; padding: 30px 24px 72px; }
 .overview { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.analytics-panel { margin-top: 18px; }
+.analytics-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 28px; padding-top: 16px; }
+.analytics-group { min-width: 0; }
+.analytics-group h3 { font-size: .95rem; margin: 0 0 10px; }
+.analytics-row { display: grid; grid-template-columns: minmax(70px, 1fr) auto; gap: 5px 12px; padding: 8px 0; font-size: .78rem; }
+.analytics-row span { overflow-wrap: anywhere; color: var(--muted); }
+.analytics-row strong { color: var(--ink); }
+.analytics-bar { grid-column: 1 / -1; height: 5px; background: var(--line-soft); border-radius: 5px; overflow: hidden; }
+.analytics-bar i { display: block; height: 100%; background: var(--green-bright); border-radius: inherit; }
+
+/* ---------- Load-shedding banner (live Eskom provider) ---------- */
+.grid-status {
+  display: flex; align-items: center; gap: 14px;
+  margin-top: 16px; padding: 16px 20px;
+  background: #fff; border: 1px solid var(--line);
+  border-radius: var(--radius); box-shadow: var(--shadow-sm);
+  transition: border-color .18s ease, background .18s ease;
+}
+.grid-status .ls-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; border-radius: 12px;
+  background: #e5f2ec; color: var(--green); flex: none;
+}
+.grid-status .ls-icon svg { width: 20px; height: 20px; }
+.grid-status .ls-body { flex: 1; min-width: 0; }
+.grid-status .ls-title { font-weight: 700; font-size: .88rem; margin: 0; }
+.grid-status .ls-detail { color: var(--muted); font-size: .82rem; margin: 3px 0 0; }
+.grid-status .ls-source { color: var(--muted); font-size: .74rem; text-align: right; flex: none; max-width: 40%; }
+.grid-status.active { background: #fdf1d8; border-color: #f0cf94; }
+.grid-status.active .ls-icon { background: var(--yellow); color: #fff; }
 
 /* ---------- Stat cards ---------- */
 .stat, .panel {
@@ -228,6 +258,8 @@ button svg { width: 15px; height: 15px; }
 @media (max-width: 900px) {
   .overview { grid-template-columns: repeat(2, 1fr); }
   .split { grid-template-columns: 1fr; }
+  .grid-status { flex-wrap: wrap; }
+  .grid-status .ls-source { max-width: 100%; text-align: left; }
 }
 @media (max-width: 760px) {
   header { display: block; }
@@ -235,4 +267,5 @@ button svg { width: 15px; height: 15px; }
   .header-mark { width: 58px; height: 58px; }
   .health { margin-top: 22px; }
   main { padding: 22px 16px 56px; }
+  .analytics-grid { grid-template-columns: 1fr; }
 }

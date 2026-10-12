@@ -57,7 +57,7 @@
             android:orientation="vertical"
             android:padding="16dp">
 
-            <!-- Category selection (colored grid) -->
+            <!-- Category selection -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -74,15 +74,41 @@
                 android:textSize="12sp"
                 android:visibility="gone" />
 
-            <GridLayout
+            <!-- Icon grid of categories (icons are assigned from /api/options at runtime) -->
+            <LinearLayout
                 android:id="@+id/category_grid"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:columnCount="2"
-                android:rowCount="4" />
+                android:orientation="vertical" />
 
-            <!-- Description + AI suggest -->
+            <TextView
+                android:id="@+id/tv_selected_category"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textColor="@color/web_primary"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="What happened? Choose an issue or describe it below"
+                android:textColor="@color/web_text" />
+            <AutoCompleteTextView
+                android:id="@+id/edit_issue_type"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/web_input"
+                android:hint="Choose an issue"
+                android:inputType="none"
+                android:paddingHorizontal="14dp" />
+
+            <!-- Description + keyword category suggestion -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -99,7 +125,7 @@
                     android:textStyle="bold" />
 
                 <Button
-                    android:id="@+id/btn_ai_suggest"
+                    android:id="@+id/btn_suggest_category"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:background="@drawable/web_outline_button"
@@ -126,7 +152,7 @@
                 android:textColorHint="@color/web_text_muted" />
 
             <TextView
-                android:id="@+id/ai_status"
+                android:id="@+id/category_suggestion_status"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
@@ -151,7 +177,8 @@
                 android:textColor="@color/web_text_muted"
                 android:textSize="11sp" />
 
-            <!-- Location -->
+            <!-- Category is chosen from the icon grid above.
+            Location -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -223,10 +250,23 @@
                 android:background="@drawable/web_input"
                 android:completionThreshold="1"
                 android:hint="@string/wc_search_municipality"
-                android:inputType="text"
+                android:inputType="none"
                 android:paddingHorizontal="14dp"
                 android:textColor="@color/web_text"
                 android:textColorHint="@color/web_text_muted" />
+
+            <Button
+                android:id="@+id/btn_photo"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="Add photo (optional, max 3 MB)"
+                android:textAllCaps="false" />
+            <TextView
+                android:id="@+id/photo_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/web_text_muted" />
 
             <!-- Urgency -->
             <TextView
@@ -277,46 +317,6 @@
                     android:textColor="@color/web_primary" />
             </LinearLayout>
 
-            <!-- Photos -->
-            <LinearLayout
-                android:id="@+id/photo_dropzone"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="18dp"
-                android:background="@drawable/web_photo_dropzone"
-                android:gravity="center"
-                android:orientation="vertical"
-                android:padding="20dp">
-
-                <ImageView
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:src="@drawable/ic_upload"
-                    app:tint="@color/web_text_muted" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:text="@string/wc_upload_photos"
-                    android:textColor="@color/web_text_muted"
-                    android:textSize="13sp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/wc_photo_limit"
-                    android:textColor="@color/web_text_muted"
-                    android:textSize="11sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/photo_preview_container"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:orientation="horizontal" />
-
             <!-- Actions -->
             <LinearLayout
                 android:layout_width="match_parent"
@@ -347,17 +347,6 @@
                     android:textColor="@color/black"
                     android:textStyle="bold" />
             </LinearLayout>
-
-            <CheckBox
-                android:id="@+id/check_safety"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:buttonTint="@color/urgency_high"
-                android:text="BROADCAST AS SAFETY ALERT"
-                android:textColor="@color/urgency_high"
-                android:textSize="11sp"
-                android:textStyle="bold" />
 
         </LinearLayout>
     </LinearLayout>

@@ -4,7 +4,6 @@ import { BackgroundWrapper } from './BackgroundWrapper';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { SOSButton } from './SOSButton';
 import { useTranslation, type Language } from '../utils/i18n';
-import { SLA_BY_CATEGORY } from '../utils/serviceData';
 import {
   ArrowLeft,
   MapPin,
@@ -28,9 +27,9 @@ export function ReportDetail({ report, onBack, language, onLanguageChange }: Rep
   const { t } = useTranslation();
 
   // SLA Countdown
-  const slaHours = SLA_BY_CATEGORY[report.category] || 48;
   const submittedDate = new Date(report.date).getTime();
-  const deadline = submittedDate + slaHours * 60 * 60 * 1000;
+  const deadline = report.sla_due_at ? new Date(report.sla_due_at).getTime() : null;
+  const slaHours = deadline === null ? 0 : Math.ceil((deadline - submittedDate) / (60 * 60 * 1000));
 
   const [timeLeft, setTimeLeft] = useState<string>('');
   const [isOverdue, setIsOverdue] = useState(false);
@@ -41,6 +40,7 @@ export function ReportDetail({ report, onBack, language, onLanguageChange }: Rep
   }, [report.databaseId, report.id, report.status]);
 
   useEffect(() => {
+    if (deadline === null) return;
     const timer = setInterval(() => {
       const now = Date.now();
       const diff = deadline - now;
@@ -88,7 +88,7 @@ export function ReportDetail({ report, onBack, language, onLanguageChange }: Rep
 
   const handleWhatsAppShare = () => {
     const message = encodeURIComponent(
-      `${t('appName')} - ${report.id}\n${report.category}\n${report.description}\n📍 ${report.location}`
+      `${t('appName')} - ${report.public_reference || report.id}\n${report.category}\n${report.description}\n📍 ${report.location_text || report.location}, ${report.municipality}`
     );
     window.open(`https://wa.me/?text=${message}`, '_blank');
   };
@@ -116,15 +116,6 @@ export function ReportDetail({ report, onBack, language, onLanguageChange }: Rep
         </div>
 
         <div className="max-w-md mx-auto p-4 pb-8">
-          {report.aiDetected && (
-            <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-xl p-3 mb-4 flex items-center gap-2">
-              <SparklesIcon />
-              <p className="text-sm text-purple-800">
-                <strong>{t('aiDetect')}:</strong> {report.aiDetected}
-              </p>
-            </div>
-          )}
-
           <div className="bg-white/95 backdrop-blur-md border-2 border-primary/20 rounded-xl p-4 mb-4 shadow-lg">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
@@ -155,9 +146,12 @@ export function ReportDetail({ report, onBack, language, onLanguageChange }: Rep
                 <MapPin className="w-4 h-4 mt-1 text-muted-foreground" />
                 <div className="flex-1">
                   <p className="text-sm text-muted-foreground">{t('locationLabel')}</p>
-                  <p className="text-foreground">{report.location}</p>
+                  <p className="text-foreground">{report.location_text || report.location}</p>
+                  <p className="text-sm text-muted-foreground">{report.municipality}</p>
                 </div>
               </div>
+
+              {report.has_photo && <div><p className="text-sm text-muted-foreground">Report photo</p><img className="mt-2 w-full rounded-lg" alt="Photo submitted with this report" src={`${import.meta.env.VITE_API_URL || 'http://localhost:8787'}/api/reports/${encodeURIComponent(report.databaseId || report.id)}/photo?externalRef=${encodeURIComponent(JSON.parse(localStorage.getItem('user') || '{}').externalRef || '')}`} /></div>}
 
               <div className="flex items-start gap-2">
                 <Calendar className="w-4 h-4 mt-1 text-muted-foreground" />
@@ -192,7 +186,7 @@ export function ReportDetail({ report, onBack, language, onLanguageChange }: Rep
           </div>
 
           {/* SLA Countdown */}
-          {report.status !== 'resolved' && (
+          {deadline !== null && !['resolved', 'closed'].includes(report.status) && (
             <div
               className={`rounded-xl p-4 mb-4 shadow-lg border-2 ${
                 isOverdue
@@ -216,20 +210,6 @@ export function ReportDetail({ report, onBack, language, onLanguageChange }: Rep
                     Expected resolution: {slaHours}h · Remaining: {timeLeft}
                   </p>
                 </div>
-              </div>
-            </div>
-          )}
-
-          {/* Photo Gallery */}
-          {report.photos && report.photos.length > 0 && (
-            <div className="bg-white/95 backdrop-blur-md border-2 border-primary/20 rounded-xl p-4 mb-4 shadow-lg">
-              <h3 className="mb-3">Attached Photos ({report.photos.length})</h3>
-              <div className="grid grid-cols-2 gap-2">
-                {report.photos.map((photo: string, index: number) => (
-                  <div key={index} className="aspect-square rounded-lg overflow-hidden border border-border">
-                    <img src={photo} alt={`Report photo ${index + 1}`} className="w-full h-full object-cover" />
-                  </div>
-                ))}
               </div>
             </div>
           )}
@@ -293,13 +273,5 @@ export function ReportDetail({ report, onBack, language, onLanguageChange }: Rep
         <SOSButton />
       </div>
     </BackgroundWrapper>
-  );
-}
-
-function SparklesIcon() {
-  return (
-    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-purple-100">
-      <FileText className="w-3 h-3 text-purple-600" />
-    </span>
   );
 }

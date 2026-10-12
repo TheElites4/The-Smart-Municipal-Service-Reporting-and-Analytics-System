@@ -47,11 +47,18 @@
     <string name="wc_urgency_medium">Medium</string>
     <string name="wc_urgency_high">High</string>
     <string name="wc_cancel">Cancel</string>
-    <string name="wc_upload_photos">Tap to upload photos (optional)</string>
     <string name="wc_suggest_category">Suggest category</string>
-    <string name="wc_ai_detected">AI Detected</string>
-    <string name="wc_ai_failed">AI could not detect an issue. Please select a category manually.</string>
+    <string name="wc_category_suggested">Suggested category</string>
+    <string name="wc_category_suggestion_empty">No matching keywords found. Choose a category from the list.</string>
     <string name="wc_please_select_category">Please select a category</string>
+    <string name="wc_selected_category">Selected category</string>
+    <string name="wc_category_water">Water &amp; Sanitation</string>
+    <string name="wc_category_electricity">Electricity</string>
+    <string name="wc_category_roads">Roads &amp; Potholes</string>
+    <string name="wc_category_streetlight">Street Lighting</string>
+    <string name="wc_category_waste">Waste Management</string>
+    <string name="wc_category_parks">Parks &amp; Recreation</string>
+    <string name="wc_category_other">Other</string>
     <string name="wc_description_required">Description is required</string>
     <string name="wc_description_min">Please provide more details (minimum 20 characters)</string>
     <string name="wc_location_required">Location is required</string>
@@ -67,7 +74,6 @@
     <string name="wc_share_whatsapp">Share on WhatsApp</string>
     <string name="wc_sla_countdown">SLA Countdown</string>
     <string name="wc_sla_overdue">SLA Overdue</string>
-    <string name="wc_attached_photos">Attached Photos</string>
     <string name="wc_no_status_events">No status events recorded yet.</string>
     <string name="wc_sos_title">Emergency SOS</string>
     <string name="wc_sos_subtitle">Select an emergency service</string>
@@ -99,17 +105,6 @@
     <string name="wc_hero_level_diamond">Diamond Hero</string>
     <string name="wc_points">points</string>
     <string name="wc_points_to_next">to next level</string>
-    <string name="wc_analytics_title">Analytics Dashboard</string>
-    <string name="wc_analytics_subtitle">Community issue trends &amp; performance</string>
-    <string name="wc_reports_by_category">Reports by Category</string>
-    <string name="wc_status_distribution">Status Distribution</string>
-    <string name="wc_monthly_trend">Monthly Trend (Reports vs Resolved)</string>
-    <string name="wc_service_status_board">Service Status Board</string>
-    <string name="wc_service_status_subtitle">Live water &amp; power status by municipality</string>
-    <string name="wc_water">Water</string>
-    <string name="wc_power">Power</string>
-    <string name="wc_normal">Normal</string>
-    <string name="wc_reduced">Reduced</string>
     <string name="wc_outage">Outage</string>
     <string name="wc_leaderboard_title">Community Leaderboard</string>
     <string name="wc_leaderboard_empty">No community reports yet.</string>
@@ -161,7 +156,7 @@
 
     <!-- ===== Assistant (CitizenAssistant.tsx) ===== -->
     <string name="assistant_title">Citizen Assistant</string>
-    <string name="assistant_subtitle">AI-powered help</string>
+    <string name="assistant_subtitle">Help assistant</string>
     <string name="assistant_open">Assistant</string>
     <string name="assistant_placeholder">Ask me anything...</string>
     <string name="assistant_welcome">Sawubona! \uD83D\uDC4B I\'m your MzansiReport assistant. How can I help you today?</string>
@@ -178,11 +173,9 @@
     <string name="wc_municipality_nearest">\uD83D\uDCCD %1$s</string>
     <string name="wc_character_count_placeholder">%1$d characters</string>
     <string name="wc_sla_expected">Expected resolution: %1$dh · Remaining: %2$s</string>
-    <string name="wc_attached_photos_placeholder">Attached Photos (%1$d)</string>
-    <string name="wc_photo_limit">Max 4 photos</string>
     <string name="wc_feed_hero_points">⭐ %1$s: %2$d points</string>
     <string name="wc_assistant_title">Citizen Assistant</string>
-    <string name="wc_assistant_subtitle">AI-powered help</string>
+    <string name="wc_assistant_subtitle">Help assistant</string>
     <string name="wc_assistant_placeholder">Ask me anything...</string>
     <string name="wc_assistant_welcome">Sawubona! 👋 I\'m your MzansiReport assistant. How can I help you today?</string>
 </resources>

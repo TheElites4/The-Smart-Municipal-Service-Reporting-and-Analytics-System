@@ -1,1 +1,2 @@
-MzansiConnect API listening on http://localhost:8787
+Starting API on 0.0.0.0:8787 (db: postgresql://postgres:***@localhost:5432/mzansi_connect)
+MzansiConnect API listening on http://0.0.0.0:8787 (localhost, 10.0.2.2, and LAN IP all reachable)

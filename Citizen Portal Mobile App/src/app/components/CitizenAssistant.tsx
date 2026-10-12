@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Bot, Send, X } from 'lucide-react';
+import { getBotResponse } from '../utils/assistantBot';
 
 interface Message {
   id: string;
@@ -7,76 +8,14 @@ interface Message {
   sender: 'user' | 'bot';
 }
 
-const RESPONSES: { keywords: string[]; response: string }[] = [
-  {
-    keywords: ['hello', 'hi', 'hey', 'sawubona', 'molweni'],
-    response:
-      "Sawubona! 👋 I'm the MzansiReport assistant. I can help with reporting issues, emergency contacts, and municipal services. How can I help?",
-  },
-  {
-    keywords: ['report', 'submit', 'new'],
-    response:
-      'To submit a report 📋: Tap "New Report" on your dashboard, choose a category, describe the issue, add your location, and submit. AI will help detect the category from your description!',
-  },
-  {
-    keywords: ['emergency', 'sos', 'police', 'fire', 'ambulance', 'medical'],
-    response:
-      'For emergencies 🚨: Police - 10111, Fire - 10177, Medical - 10177. You can also tap the red SOS button on any screen for quick access!',
-  },
-  {
-    keywords: ['loadshedding', 'load shedding', 'power', 'electricity', 'stage'],
-    response:
-      'Load shedding ⚡ information is available on your dashboard. Check the Service Status Board for live power status by area and the load-shedding banner for the current stage.',
-  },
-  {
-    keywords: ['water', 'leak', 'outage'],
-    response:
-      'Water issues 💧: Report water leaks or outages through the "New Report" form. Check the Service Status Board for live water status in your municipality.',
-  },
-  {
-    keywords: ['track', 'status', 'progress'],
-    response:
-      'To track your report 📊: Go to "My Reports" on your dashboard and tap any report to see its progress timeline and SLA countdown.',
-  },
-  {
-    keywords: ['municipality', 'contact', 'phone', 'call'],
-    response:
-      'You can find all major SA municipality contact details in the Municipality Directory. The most common emergency numbers are Police 10111, Fire 10177, and Medical 10177.',
-  },
-  {
-    keywords: ['sos', 'help', 'assist'],
-    response:
-      'I can help you with municipal issues! Ask me about reporting, tracking, emergencies, load shedding, water, or municipality contacts.',
-  },
-  {
-    keywords: ['points', 'hero', 'badge', 'level', 'gam'],
-    response:
-      '🏆 Community Hero Points! You earn 10 points for each report you submit and 2 points for each "Me Too" upvote. Level up from Bronze → Silver → Gold → Platinum → Diamond!',
-  },
-  {
-    keywords: ['community', 'feed', 'upvote', 'me too'],
-    response:
-      'The Community Feed 👥 shows what your neighbours are reporting, sorted by popularity. Use "Me Too" to upvote issues you also face - this earns you hero points!',
-  },
-  {
-    keywords: ['thank', 'thanks', 'bye', 'goodbye'],
-    response:
-      "You're welcome! 🇿🇦 Together we're building better communities. Ask me anything about MzansiReport anytime!",
-  },
+/** Quick replies mirroring the Android chatbot's suggestion chips. */
+const QUICK_QUERIES = [
+  { label: 'Report an issue', query: 'How to report a pothole or leak?' },
+  { label: 'Emergency SOS', query: 'Emergency SOS police fire numbers' },
+  { label: 'Load shedding', query: 'Load shedding stage power status' },
+  { label: 'Water leak', query: 'Water leak burst pipe report' },
+  { label: 'Hero Points', query: 'How do Hero Points work?' },
 ];
-
-const DEFAULT_RESPONSE =
-  "I'm not sure about that yet, but you can ask me about reporting issues, tracking progress, emergency contacts, load shedding, water status, municipality contacts, or community hero points!";
-
-function getBotResponse(input: string): string {
-  const lower = input.toLowerCase();
-  for (const item of RESPONSES) {
-    if (item.keywords.some((kw) => lower.includes(kw))) {
-      return item.response;
-    }
-  }
-  return DEFAULT_RESPONSE;
-}
 
 export function CitizenAssistant() {
   const [open, setOpen] = useState(false);
@@ -107,6 +46,7 @@ export function CitizenAssistant() {
     setInput('');
     setTyping(true);
 
+    // Matches the Android ChatbotFragment's 1s "typing" delay.
     setTimeout(() => {
       const botMessage: Message = {
         id: `bot-${Date.now()}`,
@@ -114,6 +54,22 @@ export function CitizenAssistant() {
         sender: 'bot',
       };
       setMessages((prev) => [...prev, botMessage]);
+      setTyping(false);
+    }, 1000);
+  };
+
+  const sendQuickQuery = (query: string) => {
+    setInput(query);
+    if (!query.trim()) return;
+    const userMessage: Message = { id: `user-${Date.now()}`, text: query, sender: 'user' };
+    setMessages((prev) => [...prev, userMessage]);
+    setInput('');
+    setTyping(true);
+    setTimeout(() => {
+      setMessages((prev) => [
+        ...prev,
+        { id: `bot-${Date.now()}`, text: getBotResponse(query), sender: 'bot' },
+      ]);
       setTyping(false);
     }, 1000);
   };
@@ -140,7 +96,7 @@ export function CitizenAssistant() {
               </div>
               <div>
                 <h3 className="font-semibold">Citizen Assistant</h3>
-                <p className="text-xs text-white/80">AI-powered help</p>
+                <p className="text-xs text-white/80">Help assistant</p>
               </div>
             </div>
             <button
@@ -181,6 +137,18 @@ export function CitizenAssistant() {
               </div>
             )}
             <div ref={bottomRef} />
+          </div>
+
+          <div className="px-3 pt-3 pb-2 border-t border-gray-200 bg-white flex gap-2 overflow-x-auto">
+            {QUICK_QUERIES.map((chip) => (
+              <button
+                key={chip.label}
+                onClick={() => sendQuickQuery(chip.query)}
+                className="shrink-0 px-3 py-1.5 rounded-full border border-[#1e5a7d]/30 text-[#1e5a7d] text-xs font-medium hover:bg-[#1e5a7d]/10 transition-colors"
+              >
+                {chip.label}
+              </button>
+            ))}
           </div>
 
           <div className="p-3 border-t border-gray-200 bg-white flex gap-2">

@@ -90,12 +90,6 @@
         tools:layout="@layout/fragment_community_feed" />
 
     <fragment
-        android:id="@+id/navigation_municipality_directory"
-        android:name="com.example.mzansiconnect.ui.municipality.MunicipalityDirectoryFragment"
-        android:label="Municipality Directory"
-        tools:layout="@layout/fragment_municipality_directory" />
-
-    <fragment
         android:id="@+id/navigation_home"
         android:name="com.example.mzansiconnect.ui.home.HomeFragment"
         android:label="Home"
@@ -130,21 +124,9 @@
         tools:layout="@layout/fragment_notifications" />
 
     <fragment
-        android:id="@+id/navigation_service_status"
-        android:name="com.example.mzansiconnect.ui.status.ServiceStatusFragment"
-        android:label="Live Status"
-        tools:layout="@layout/fragment_service_status" />
-
-    <fragment
-        android:id="@+id/navigation_analytics"
-        android:name="com.example.mzansiconnect.ui.analytics.AnalyticsFragment"
-        android:label="Insights"
-        tools:layout="@layout/fragment_analytics" />
-
-    <fragment
         android:id="@+id/navigation_chatbot"
         android:name="com.example.mzansiconnect.ui.chatbot.ChatbotFragment"
-        android:label="AI Assistant"
+        android:label="Help Assistant"
         tools:layout="@layout/fragment_chatbot" />
 
     <fragment

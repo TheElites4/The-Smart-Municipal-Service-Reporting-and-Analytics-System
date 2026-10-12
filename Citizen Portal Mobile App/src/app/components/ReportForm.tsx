@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -6,80 +6,25 @@ import { BackgroundWrapper } from './BackgroundWrapper';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { SOSButton } from './SOSButton';
 import { useTranslation, type Language } from '../utils/i18n';
-import { MUNICIPALITY_NAMES } from '../utils/rsaMunicipalities';
-import {
-  FileText,
-  MapPin,
-  Upload,
-  Locate,
-  Droplet,
-  Zap,
-  Construction,
-  Lightbulb,
-  Trash2,
-  Trees,
-  MoreHorizontal,
-  Sparkles,
-  CheckCircle2,
-  XCircle,
-} from 'lucide-react';
+import { FileText, MapPin, Locate, CheckCircle2, XCircle, Check } from 'lucide-react';
+import { categoryVisual } from '../utils/categoryIcons';
+
+const api = import.meta.env.VITE_API_URL || 'http://localhost:8787';
 
 interface ReportFormProps {
-  onSubmit: (report: any) => void;
+  onSubmit: (report: any) => Promise<void>;
   onCancel: () => void;
   language: Language;
   onLanguageChange: (lang: Language) => void;
 }
 
-const ISSUE_CATEGORIES = [
-  {
-    name: 'Water & Sanitation',
-    icon: Droplet,
-    color: 'bg-blue-100 text-blue-700 border-blue-300',
-    keywords: ['water', 'leak', 'pipe', 'sewage', 'drain', 'flood', 'meter'],
-  },
-  {
-    name: 'Electricity',
-    icon: Zap,
-    color: 'bg-yellow-100 text-yellow-700 border-yellow-300',
-    keywords: ['power', 'electricity', 'outage', 'cable', 'spark', 'wire', 'transformer'],
-  },
-  {
-    name: 'Roads & Potholes',
-    icon: Construction,
-    color: 'bg-orange-100 text-orange-700 border-orange-300',
-    keywords: ['pothole', 'road', 'asphalt', 'traffic', 'street', 'pavement', 'crater'],
-  },
-  {
-    name: 'Street Lighting',
-    icon: Lightbulb,
-    color: 'bg-amber-100 text-amber-700 border-amber-300',
-    keywords: ['light', 'lamp', 'streetlight', 'dark', 'bulb', 'illuminat'],
-  },
-  {
-    name: 'Waste Management',
-    icon: Trash2,
-    color: 'bg-green-100 text-green-700 border-green-300',
-    keywords: ['garbage', 'waste', 'rubbish', 'litter', 'bin', 'dump', 'refuse'],
-  },
-  {
-    name: 'Parks & Recreation',
-    icon: Trees,
-    color: 'bg-emerald-100 text-emerald-700 border-emerald-300',
-    keywords: ['park', 'playground', 'grass', 'tree', 'garden', 'green'],
-  },
-  {
-    name: 'Other',
-    icon: MoreHorizontal,
-    color: 'bg-gray-100 text-gray-700 border-gray-300',
-    keywords: [],
-  },
-];
-
 export function ReportForm({ onSubmit, onCancel, language, onLanguageChange }: ReportFormProps) {
   const { t } = useTranslation();
+  const [serviceOptions, setServiceOptions] = useState<{ categories: string[]; municipalities: string[]; issues: { category: string; label: string }[] }>({ categories: [], municipalities: [], issues: [] });
+  const [optionsUnavailable, setOptionsUnavailable] = useState(false);
   const [formData, setFormData] = useState({
     category: '',
+    issueType: '',
     description: '',
     location: '',
     municipality: '',
@@ -87,29 +32,19 @@ export function ReportForm({ onSubmit, onCancel, language, onLanguageChange }: R
   });
 const [errors, setErrors] = useState<Record<string, string>>({});
   const [locating, setLocating] = useState(false);
-  const [aiStatus, setAiStatus] = useState<
-    'idle' | 'analyzing' | 'detected' | 'failed'
-  >('idle');
-  const [aiDetectedCategory, setAiDetectedCategory] = useState('');
-  const [photos, setPhotos] = useState<string[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [suggestionStatus] = useState<'idle' | 'matched' | 'unmatched'>('idle');
+  const [suggestedCategory] = useState('');
+  const [coordinates, setCoordinates] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [photo, setPhoto] = useState<{ base64: string; contentType: string } | null>(null);
+  const [photoName, setPhotoName] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-
-    const newPhotos: string[] = [];
-    Array.from(files).slice(0, 4).forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result === 'string') {
-          newPhotos.push(reader.result);
-          setPhotos((prev) => [...prev, reader.result as string]);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
-  };
+  useEffect(() => {
+    fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8787'}/api/options`)
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error('Options unavailable')))
+      .then((options) => setServiceOptions({ categories: options.categories || [], municipalities: options.municipalities || [], issues: options.issues || [] }))
+      .catch(() => setOptionsUnavailable(true));
+  }, []);
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -118,31 +53,15 @@ const [errors, setErrors] = useState<Record<string, string>>({});
       newErrors.category = t('pleaseSelectCategory');
     }
 
-    if (!formData.description.trim()) {
-      newErrors.description = t('descriptionRequired');
-    } else if (formData.description.length < 20) {
-      newErrors.description = t('descriptionMin');
-    }
+    if (!formData.issueType && !formData.description.trim()) newErrors.description = 'Choose an issue or describe what happened.';
 
     if (!formData.location.trim()) {
       newErrors.location = t('locationRequired');
     }
+    if (!serviceOptions.municipalities.includes(formData.municipality)) newErrors.municipality = 'Choose a municipality from the list.';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  };
-
-  const handleAiDetection = (description: string) => {
-    setAiDetectedCategory('');
-    const lower = description.toLowerCase();
-    const detected = ISSUE_CATEGORIES.find((cat) => cat.keywords.some((keyword) => lower.includes(keyword)))?.name;
-    if (detected) {
-      setAiDetectedCategory(detected);
-      setFormData((prev) => ({ ...prev, category: detected }));
-      setAiStatus('detected');
-    } else {
-      setAiStatus('failed');
-    }
   };
 
   const getMunicipality = async () => {
@@ -158,14 +77,15 @@ const [errors, setErrors] = useState<Record<string, string>>({});
       async (position) => {
         const { latitude, longitude } = position.coords;
 
-        const coordinates = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
         try {
-          const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`, { headers: { Accept: 'application/json' } });
-          const place = response.ok ? await response.json() : null;
-          const municipality = place?.address?.municipality || place?.address?.city || place?.address?.town || '';
-          setFormData((previous) => ({ ...previous, municipality, location: coordinates }));
-        } catch {
-          setFormData((previous) => ({ ...previous, location: coordinates }));
+          const response = await fetch(`${api}/api/location/reverse?latitude=${latitude}&longitude=${longitude}`);
+          const place = await response.json();
+          if (!response.ok || !place.location) throw new Error(place.error || 'Could not identify your location');
+          setCoordinates({ latitude, longitude });
+          setFormData((previous) => ({ ...previous, municipality: serviceOptions.municipalities.includes(place.municipality) ? place.municipality : '', location: place.location }));
+          if (!serviceOptions.municipalities.includes(place.municipality)) alert('Location found. Please choose your municipality from the list.');
+        } catch (error) {
+          alert(error instanceof Error ? error.message : 'Location lookup unavailable. Enter an address manually.');
         } finally {
           setLocating(false);
         }
@@ -178,21 +98,32 @@ const [errors, setErrors] = useState<Record<string, string>>({});
     );
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const choosePhoto = async (file?: File) => {
+    setPhoto(null);
+    setPhotoName('');
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 3_000_000) {
+      setErrors((previous) => ({ ...previous, photo: 'Choose a JPEG, PNG or WebP photo under 3 MB.' }));
+      return;
+    }
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(new Error('Unable to read photo'));
+      reader.readAsDataURL(file);
+    });
+    setPhoto({ contentType: file.type, base64: dataUrl.split(',')[1] });
+    setPhotoName(file.name);
+    setErrors((previous) => ({ ...previous, photo: '' }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!validate()) return;
-
-const report = {
-      id: `RPT-${Date.now()}`,
-      ...formData,
-      status: 'submitted',
-      date: new Date().toISOString(),
-      aiDetected: aiStatus === 'detected' ? aiDetectedCategory : null,
-      photos,
-    };
-
-    onSubmit(report);
+    if (!validate() || submitting) return;
+    setSubmitting(true);
+    try { await onSubmit({ ...formData, description: [formData.issueType, formData.description.trim()].filter(Boolean).join(' — '), ...coordinates, ...(photo ? { photo } : {}) }); }
+    catch { /* The parent displays the API error; keep this form available to retry. */ }
+    finally { setSubmitting(false); }
   };
 
   return (
@@ -216,91 +147,90 @@ const report = {
             <form onSubmit={handleSubmit} className="space-y-5 mt-4">
               <div>
                 <Label>{t('selectCategory')}</Label>
-                <div className="grid grid-cols-2 gap-3 mt-3">
-                  {ISSUE_CATEGORIES.map((cat) => {
-                    const Icon = cat.icon;
-                    const isSelected = formData.category === cat.name;
-                    return (
-                      <button
-                        key={cat.name}
-                        type="button"
-                        onClick={() =>
-                          setFormData({ ...formData, category: cat.name })
-                        }
-                        className={`p-4 rounded-lg border-2 transition-all ${
-                          isSelected
-                            ? `${cat.color} border-current shadow-md scale-105`
-                            : 'bg-white border-border hover:border-primary/30'
-                        }`}
-                      >
-                        <Icon className={`w-8 h-8 mx-auto mb-2 ${isSelected ? '' : 'text-muted-foreground'}`} />
-                        <p className={`text-sm font-medium text-center ${isSelected ? '' : 'text-foreground'}`}>
-                          {cat.name}
-                        </p>
-                      </button>
-                    );
-                  })}
-                </div>
+                {optionsUnavailable ? (
+                  <p className="mt-2 text-sm text-muted-foreground">Categories unavailable — check the service connection.</p>
+                ) : (
+                  <div role="radiogroup" aria-label={t('selectCategory')} className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mt-3">
+                    {serviceOptions.categories.map((category) => {
+                      const { Icon, selected, idle } = categoryVisual(category);
+                      const isSelected = formData.category === category;
+                      return (
+                        <button
+                          key={category}
+                          type="button"
+                          role="radio"
+                          aria-checked={isSelected}
+                          onClick={() => setFormData((previous) => ({ ...previous, category, issueType: '' }))}
+                          className={`relative flex flex-col items-center gap-2 rounded-xl border p-3 text-center transition-all ${
+                            isSelected
+                              ? 'border-[#1e5a7d] bg-[#1e5a7d]/5 ring-2 ring-[#1e5a7d]/30 shadow-sm'
+                              : 'border-border bg-white hover:border-[#1e5a7d]/40 hover:shadow-sm'
+                          }`}
+                        >
+                          {isSelected && (
+                            <span className="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#1e5a7d] text-white">
+                              <Check className="w-3 h-3" strokeWidth={3} />
+                            </span>
+                          )}
+                          <span className={`flex h-11 w-11 items-center justify-center rounded-full transition-colors ${isSelected ? selected : idle}`}>
+                            <Icon className="w-5 h-5" strokeWidth={2} />
+                          </span>
+                          <span className={`text-xs font-medium leading-tight ${isSelected ? 'text-[#1e5a7d]' : 'text-foreground'}`}>{category}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
                 {errors.category && (
                   <p className="mt-2 text-sm text-destructive">{errors.category}</p>
                 )}
               </div>
 
               <div>
+                <Label htmlFor="issue-type">What happened? (choose instead of typing)</Label>
+                <select id="issue-type" value={formData.issueType} onChange={(event) => setFormData({ ...formData, issueType: event.target.value })} disabled={!formData.category} className="mt-2 w-full rounded-lg border-border bg-input-background px-4 py-3">
+                  <option value="">Choose an issue or describe it below</option>
+                  {serviceOptions.issues.filter((issue) => issue.category === formData.category).map((issue) => <option key={issue.label} value={issue.label}>{issue.label}</option>)}
+                </select>
+              </div>
+
+              <div>
                 <div className="flex items-center justify-between mb-2">
                   <Label htmlFor="description">{t('description')}</Label>
-                  <button
-                    type="button"
-                    onClick={() => handleAiDetection(formData.description)}
-                    className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-[#1e5a7d]/10 text-[#1e5a7d] hover:bg-[#1e5a7d]/20 transition-colors"
-                  >
-                    <Sparkles className="w-3 h-3" />
-                    Suggest category
-                  </button>
                 </div>
                 <textarea
                   id="description"
                   value={formData.description}
                   onChange={(e) => {
                     setFormData({ ...formData, description: e.target.value });
-                    if (aiStatus !== 'idle') setAiStatus('idle');
                   }}
                   placeholder="Provide detailed information about the issue..."
                   rows={5}
                   className="w-full px-4 py-3 rounded-lg bg-input-background border border-border focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground resize-none"
                 />
 
-                {/* AI Detection Status */}
-                {aiStatus === 'analyzing' && (
-                  <div className="mt-2 flex items-center gap-2 p-3 rounded-lg bg-blue-50 border border-blue-200">
-                    <Sparkles className="w-4 h-4 text-blue-500 animate-pulse" />
-                    <p className="text-sm text-blue-700">Checking description keywords</p>
-                  </div>
-                )}
-                {aiStatus === 'detected' && (
+                {false && suggestionStatus === 'matched' && (
                   <div className="mt-2 flex items-start gap-2 p-3 rounded-lg bg-green-50 border border-green-200">
                     <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5" />
                     <div>
                       <p className="text-sm font-medium text-green-800">
-                        {t('aiDetect')}: {aiDetectedCategory}
+                        {t('categorySuggested')}: {suggestedCategory}
                       </p>
                       <p className="text-xs text-green-700">Category auto-selected</p>
                     </div>
                   </div>
                 )}
-                {aiStatus === 'failed' && (
+                {false && suggestionStatus === 'unmatched' && (
                   <div className="mt-2 flex items-center gap-2 p-3 rounded-lg bg-red-50 border border-red-200">
                     <XCircle className="w-4 h-4 text-red-500" />
-                    <p className="text-sm text-red-700">{t('aiAnalysisFailed')}</p>
+                    <p className="text-sm text-red-700">{t('categorySuggestionNoMatch')}</p>
                   </div>
                 )}
 
                 {errors.description && (
                   <p className="mt-1 text-sm text-destructive">{errors.description}</p>
                 )}
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {formData.description.length} {t('characterCount')}
-                </p>
+                <p className="mt-1 text-sm text-muted-foreground">{formData.description.length} characters · Optional details are saved exactly as entered.</p>
               </div>
 
               <div>
@@ -313,7 +243,7 @@ const report = {
                     id="location"
                     placeholder={t('streetAddressPlaceholder')}
                     value={formData.location}
-                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                    onChange={(e) => { setCoordinates(null); setFormData({ ...formData, location: e.target.value }); }}
                     className="flex-1"
                   />
                   <Button
@@ -327,14 +257,22 @@ const report = {
                   </Button>
                 </div>
                 {errors.location && <p className="mt-1 text-sm text-destructive">{errors.location}</p>}
-                {formData.municipality && (
-                  <p className="mt-2 text-sm text-primary font-medium">
-                    📍 {formData.municipality}
-                  </p>
-                )}
-                <label className="block mt-3 text-sm text-muted-foreground" htmlFor="municipality-confirm">Confirm municipality if the map result is incomplete</label>
-                <input id="municipality-confirm" list="rsa-municipalities" value={formData.municipality} onChange={(event) => setFormData((previous) => ({ ...previous, municipality: event.target.value }))} className="w-full px-4 py-3 rounded-lg bg-input-background border border-border" placeholder="Search South African municipality" />
-                <datalist id="rsa-municipalities">{MUNICIPALITY_NAMES.map((name) => <option key={name} value={name} />)}</datalist>
+                {formData.location && <p className="mt-2 text-sm text-primary font-medium">📍 {formData.location}{formData.municipality ? ` · ${formData.municipality}` : ''}</p>}
+                <label className="block mt-3 text-sm text-muted-foreground" htmlFor="municipality-confirm">Choose your municipality</label>
+                <select id="municipality-confirm" value={formData.municipality} onChange={(event) => setFormData((previous) => ({ ...previous, municipality: event.target.value }))} disabled={!serviceOptions.municipalities.length} className="w-full px-4 py-3 rounded-lg bg-input-background border border-border">
+                  <option value="">{optionsUnavailable ? 'Municipalities unavailable' : 'Choose municipality'}</option>
+                  {serviceOptions.municipalities.map((name) => <option key={name} value={name}>{name}</option>)}
+                </select>
+                {errors.municipality && <p className="mt-1 text-sm text-destructive">{errors.municipality}</p>}
+              </div>
+
+              <div>
+                <Label htmlFor="report-photo">Add a photo (optional)</Label>
+                <Input id="report-photo" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={(event) => choosePhoto(event.target.files?.[0]).catch(() => setErrors((previous) => ({ ...previous, photo: 'Unable to read photo.' })))} className="mt-2" />
+                <p className="mt-1 text-sm text-muted-foreground">{photoName || 'JPEG, PNG or WebP · max 3 MB · stored with your report'}</p>
+                {photo && <img src={`data:${photo.contentType};base64,${photo.base64}`} alt="Selected report preview" className="mt-3 max-h-48 w-full rounded-lg object-cover" />}
+                {photo && <Button type="button" variant="outline" onClick={() => { setPhoto(null); setPhotoName(''); }} className="mt-2">Remove photo</Button>}
+                {errors.photo && <p className="text-sm text-destructive">{errors.photo}</p>}
               </div>
 
               <div>
@@ -357,41 +295,6 @@ const report = {
                 </div>
               </div>
 
-<div>
-                <div
-                  className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-[#1e5a7d]/40 transition-colors"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">{t('uploadPhotos')}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Max 4 photos</p>
-                </div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handlePhotoUpload}
-                  className="hidden"
-                />
-                {photos.length > 0 && (
-                  <div className="grid grid-cols-4 gap-2 mt-3">
-                    {photos.map((photo, index) => (
-                      <div key={index} className="relative aspect-square rounded-lg overflow-hidden border border-border">
-                        <img src={photo} alt={`Upload ${index + 1}`} className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => setPhotos(photos.filter((_, i) => i !== index))}
-                          className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-5 mt-2 border-t border-border/70">
                 <Button
                   type="button"
@@ -401,7 +304,7 @@ const report = {
                 >
                   {t('cancel')}
                 </Button>
-                <Button type="submit" className="w-full min-w-0 min-h-12 bg-[#f4b942] text-[#17383a] hover:bg-[#f4b942]/90 shadow-md">
+                <Button type="submit" disabled={submitting || optionsUnavailable || !serviceOptions.categories.length || !serviceOptions.municipalities.length} className="w-full min-w-0 min-h-12 bg-[#f4b942] text-[#17383a] hover:bg-[#f4b942]/90 shadow-md">
                   {t('submitReport')}
                 </Button>
               </div>

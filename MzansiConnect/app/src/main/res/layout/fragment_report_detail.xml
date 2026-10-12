@@ -60,17 +60,6 @@
             android:orientation="vertical"
             android:padding="16dp">
 
-            <!-- AI detected banner -->
-            <TextView
-                android:id="@+id/detail_ai_banner"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@drawable/chip_bg"
-                android:padding="12dp"
-                android:textColor="@color/web_primary"
-                android:textSize="13sp"
-                android:visibility="gone" />
-
             <!-- Main info card -->
             <LinearLayout
                 android:layout_width="match_parent"
@@ -151,6 +140,15 @@
                     android:textColor="@color/web_text"
                     android:textSize="14sp" />
 
+                <ImageView
+                    android:id="@+id/detail_photo"
+                    android:layout_width="match_parent"
+                    android:layout_height="220dp"
+                    android:layout_marginTop="12dp"
+                    android:contentDescription="Photo submitted with report"
+                    android:scaleType="centerCrop"
+                    android:visibility="gone" />
+
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -228,33 +226,6 @@
                         android:textColor="@color/web_text_muted"
                         android:textSize="12sp" />
                 </LinearLayout>
-            </LinearLayout>
-
-            <!-- Photo gallery -->
-            <LinearLayout
-                android:id="@+id/card_photos"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:background="@drawable/web_card"
-                android:orientation="vertical"
-                android:padding="16dp"
-                android:visibility="gone">
-
-                <TextView
-                    android:id="@+id/photos_title"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textColor="@color/web_text"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
-
-                <LinearLayout
-                    android:id="@+id/photos_container"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:orientation="horizontal" />
             </LinearLayout>
 
             <!-- Tracking timeline -->

@@ -22,7 +22,14 @@ const json = (res, status, body, req) => {
 };
 const body = async (req) => {
   let raw = '';
-  for await (const chunk of req) raw += chunk;
+  for await (const chunk of req) {
+    raw += chunk;
+    if (raw.length > 4_100_000) {
+      const error = new Error('Request too large (maximum photo size is 3 MB)');
+      error.statusCode = 413;
+      throw error;
+    }
+  }
   if (!raw) return {};
   try {
     return JSON.parse(raw);
@@ -35,6 +42,20 @@ const body = async (req) => {
 const query = (text, values = []) => pool.query(text, values);
 const hasFields = (input, fields) => fields.every((field) => typeof input[field] === 'string' && input[field].trim());
 const validStatuses = new Set(['submitted', 'under_review', 'assigned', 'in_progress', 'resolved', 'closed', 'rejected']);
+
+/**
+ * Normalise a municipality for comparison so staff and admin dashboards always
+ * agree on which reports belong to them. Handles casing, surrounding whitespace,
+ * repeated spaces, an optional leading "City of"/"Municipality of" prefix and an
+ * optional trailing "Local/Metropolitan/District Municipality" suffix.
+ */
+const normaliseMunicipality = (value) => String(value ?? '')
+  .trim()
+  .toLowerCase()
+  .replace(/^(city|municipality|metro|metropolitan municipality) of\s+/, '')
+  .replace(/\s+(local|metropolitan|district)\s+municipality$/, '')
+  .replace(/\s+municipality$/, '')
+  .replace(/\s+/g, ' ');
 const authSecret = process.env.AUTH_SECRET || 'development-only-change-this-secret';
 const tokenTtlSeconds = 8 * 60 * 60;
 const signToken = (payload) => {
@@ -85,20 +106,51 @@ const eskomStatus = async (latitude, longitude) => {
 };
 const broadcast = (event, payload) => {
   const message = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
+  const payloadMunicipality = normaliseMunicipality(payload.municipality);
   for (const client of realtimeClients) {
-    if (client.citizenId === payload.citizen_id || client.user?.role === 'admin' || client.user?.municipality === payload.municipality) client.res.write(message);
+    const isOwner = Boolean(client.citizenId) && String(client.citizenId) === String(payload.citizen_id);
+    const isAdmin = client.user?.role === 'admin';
+    // Staff must always see the report the moment it is submitted, regardless of
+    // how the report's municipality is spelled/normalised. Only restrict them when
+    // they have a municipality scope AND the report carries a mismatching one.
+    const staffScope = client.user?.role === 'staff' ? normaliseMunicipality(client.user.municipality) : '';
+    const staffCanSee = Boolean(client.user) && client.user?.role !== 'staff'
+      ? false
+      : Boolean(client.user) && client.user?.role === 'staff'
+        ? (!staffScope || !payloadMunicipality || staffScope === payloadMunicipality)
+        : false;
+    if (isOwner || isAdmin || staffCanSee) client.res.write(message);
   }
 };
 
 async function dashboardData(municipality) {
-  const filter = municipality ? 'WHERE r.municipality = $1' : '';
+  // Compare municipalities case-insensitively and ignoring the optional
+  // "City of"/"Municipality of"/"... Local Municipality" wording, so a staff
+  // account typed as "sol plaatje municipality" still matches reports stored as
+  // "Sol Plaatje Local Municipality". Without this a staff member logs in and
+  // sees an empty queue even though reports for their area exist.
+  const filter = municipality ? 'WHERE normalise_municipality(r.municipality) = normalise_municipality($1)' : '';
   const values = municipality ? [municipality] : [];
   const [summary, queue, staff] = await Promise.all([
     query(`SELECT count(*)::int AS total, count(*) FILTER (WHERE status IN ('submitted','under_review'))::int AS unassigned, count(*) FILTER (WHERE status = 'in_progress')::int AS in_progress, count(*) FILTER (WHERE status IN ('resolved','closed'))::int AS resolved FROM service_reports r ${filter}`, values),
     query(`SELECT r.id, r.public_reference, r.category, r.description, r.location_text, r.urgency, r.status, r.created_at, r.sla_due_at, u.full_name AS citizen_name, a.staff_id, su.full_name AS staff_name FROM service_reports r JOIN app_users u ON u.id = r.citizen_id LEFT JOIN report_assignments a ON a.report_id = r.id LEFT JOIN app_users su ON su.id = a.staff_id ${filter} ORDER BY CASE r.urgency WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END, r.created_at DESC LIMIT 100`, values),
-    query(`SELECT u.id, u.full_name, u.department, u.municipality, u.is_active, u.last_seen_at, count(a.report_id)::int AS open_jobs FROM app_users u LEFT JOIN report_assignments a ON a.staff_id = u.id LEFT JOIN service_reports r ON r.id = a.report_id AND r.status NOT IN ('resolved','closed') WHERE u.role = 'staff' ${municipality ? 'AND u.municipality = $1' : ''} GROUP BY u.id ORDER BY open_jobs DESC`, values)
+    query(`SELECT u.id, u.full_name, u.department, u.municipality, u.is_active, u.last_seen_at, count(a.report_id)::int AS open_jobs FROM app_users u LEFT JOIN report_assignments a ON a.staff_id = u.id LEFT JOIN service_reports r ON r.id = a.report_id AND r.status NOT IN ('resolved','closed') WHERE u.role = 'staff' ${municipality ? 'AND normalise_municipality(u.municipality) = normalise_municipality($1)' : ''} GROUP BY u.id ORDER BY open_jobs DESC`, values)
   ]);
   return { summary: summary.rows[0], reports: queue.rows, staff: staff.rows };
+}
+async function adminAnalytics() {
+  const [categories, statuses, monthly, municipalities] = await Promise.all([
+    query('SELECT category AS label, count(*)::int AS count FROM service_reports GROUP BY category ORDER BY count DESC, category'),
+    query('SELECT status::text AS label, count(*)::int AS count FROM service_reports GROUP BY status ORDER BY count DESC, status'),
+    query("SELECT to_char(date_trunc('month', created_at), 'YYYY-MM') AS label, count(*)::int AS reports, count(*) FILTER (WHERE status IN ('resolved','closed'))::int AS resolved FROM service_reports WHERE created_at >= date_trunc('month', now()) - interval '11 months' GROUP BY date_trunc('month', created_at) ORDER BY date_trunc('month', created_at)"),
+    query('SELECT municipality AS label, count(*)::int AS count FROM service_reports GROUP BY municipality ORDER BY count DESC, municipality LIMIT 10')
+  ]);
+  return {
+    categories: categories.rows,
+    statuses: statuses.rows,
+    monthly: monthly.rows,
+    municipalities: municipalities.rows
+  };
 }
 
 const server = http.createServer(async (req, res) => {
@@ -113,16 +165,28 @@ const server = http.createServer(async (req, res) => {
         return json(res, 503, { ok: false, database: 'unavailable' }, req);
       }
     }
-    if (req.method === 'GET' && url.pathname === '/api/loadshedding/schedules') {
-      try {
-        const fs = require('fs');
-        const path = require('path');
-        const file = path.join(__dirname, '../data/eskom_loadshedding_schedules.json');
-        const content = fs.readFileSync(file, 'utf8');
-        return json(res, 200, JSON.parse(content), req);
-      } catch (err) {
-        return json(res, 500, { error: 'Failed to read loadshedding schedule dataset' }, req);
-      }
+    if (req.method === 'GET' && url.pathname === '/api/options') {
+      const [municipalities, categories, issues] = await Promise.all([
+        query('SELECT name FROM municipalities ORDER BY name'),
+        query('SELECT name FROM service_categories WHERE is_active = true ORDER BY name'),
+        query('SELECT category, label FROM service_issue_types ORDER BY category, label')
+      ]);
+      return json(res, 200, { municipalities: municipalities.rows.map((row) => row.name), categories: categories.rows.map((row) => row.name), issues: issues.rows }, req);
+    }
+    if (req.method === 'GET' && url.pathname === '/api/location/reverse') {
+      const latitude = Number(url.searchParams.get('latitude'));
+      const longitude = Number(url.searchParams.get('longitude'));
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) return json(res, 400, { error: 'Valid coordinates required' }, req);
+      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&zoom=18&lat=${latitude}&lon=${longitude}`, { headers: { 'user-agent': process.env.GEOCODER_USER_AGENT || 'MzansiConnect/1.0 (configure GEOCODER_USER_AGENT)', accept: 'application/json' } });
+      if (!response.ok) return json(res, 503, { error: 'Location lookup unavailable' }, req);
+      const place = await response.json();
+      if (place.address?.country_code !== 'za') return json(res, 422, { error: 'Location is outside South Africa' }, req);
+      const address = place.address;
+      const location = [address.road || address.pedestrian || address.neighbourhood || address.suburb || address.village, address.suburb || address.village || address.town || address.city].filter((part, index, parts) => part && parts.indexOf(part) === index).join(', ') || place.display_name;
+      const candidates = [address.municipality, address.city, address.county, address.state_district].filter(Boolean);
+      const rows = await query('SELECT name FROM municipalities');
+      const municipality = rows.rows.find((row) => candidates.some((candidate) => normaliseMunicipality(candidate) === normaliseMunicipality(row.name)))?.name || null;
+      return json(res, 200, { location, municipality }, req);
     }
     if (req.method === 'GET' && url.pathname === '/api/location/status') {
       const latitude = url.searchParams.get('latitude');
@@ -131,32 +195,17 @@ const server = http.createServer(async (req, res) => {
       if (latitude && longitude) {
         status = await eskomStatus(latitude, longitude);
       }
-      if (!status) {
-        try {
-          const fs = require('fs');
-          const path = require('path');
-          const file = path.join(__dirname, '../data/eskom_loadshedding_schedules.json');
-          const content = fs.readFileSync(file, 'utf8');
-          const dataset = JSON.parse(content);
-          return json(res, 200, {
-            current: false,
-            stage: dataset.currentNationalStage || 0,
-            areas: ["City of Johannesburg", "City of Tshwane", "eThekwini", "City of Cape Town", "Ekurhuleni"],
-            updatedAt: dataset.updatedAt,
-            source: 'Eskom & Municipal Schedule Dataset'
-          }, req);
-        } catch {
-          return json(res, 503, { error: 'Live EskomSePush status unavailable for this location' }, req);
-        }
-      }
+      if (!status) return json(res, 503, { error: 'Live EskomSePush status unavailable for this location' }, req);
       return json(res, 200, status, req);
     }
     if (req.method === 'POST' && url.pathname === '/api/auth/login') {
       const input = await body(req);
       if (!hasFields(input, ['email', 'password'])) return json(res, 400, { error: 'email and password are required' }, req);
-      const result = await query('SELECT id, full_name, email, role, municipality, department FROM app_users WHERE lower(email) = lower($1) AND password_hash = crypt($2, password_hash) AND is_active = true LIMIT 1', [input.email, input.password]);
+      const result = await query('SELECT id, full_name, email, phone, role, municipality, department FROM app_users WHERE lower(email) = lower($1) AND password_hash = crypt($2, password_hash) AND is_active = true LIMIT 1', [input.email, input.password]);
       const account = result.rows[0];
       if (!account) return json(res, 401, { error: 'Invalid email or password' }, req);
+      // Multi-factor authentication has been disabled for this deployment, so a
+      // correct email and password signs staff and admin users straight in.
       const token = signToken({ sub: account.id, role: account.role, email: account.email, municipality: account.municipality, exp: Math.floor(Date.now() / 1000) + tokenTtlSeconds });
       await query('UPDATE app_users SET last_seen_at = now() WHERE id = $1', [account.id]);
       return json(res, 200, { token, expiresIn: tokenTtlSeconds, user: { id: account.id, fullName: account.full_name, email: account.email, role: account.role, municipality: account.municipality, department: account.department } }, req);
@@ -165,7 +214,6 @@ const server = http.createServer(async (req, res) => {
       const user = requireRole(req, url, ['staff', 'admin']);
       const citizenId = url.searchParams.get('citizenId');
       if (!user && !citizenId) return json(res, 401, { error: 'Authentication or citizenId required' }, req);
-      if (user?.role === 'staff' && !user.municipality) return json(res, 403, { error: 'Staff account has no municipality scope' }, req);
       res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive', ...corsHeaders(req) });
       res.write(`event: connected\ndata: ${JSON.stringify({ at: new Date().toISOString() })}\n\n`);
       realtimeClients.add({ res, user, citizenId });
@@ -176,8 +224,14 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && url.pathname === '/api/dashboard') {
       const user = requireRole(req, url, ['staff', 'admin']);
       if (!user) return json(res, 401, { error: 'Authentication required' }, req);
-      if (user.role === 'staff' && url.searchParams.get('municipality') && url.searchParams.get('municipality') !== user.municipality) return json(res, 403, { error: 'Municipality access denied' }, req);
-      return json(res, 200, await dashboardData(user.role === 'staff' ? user.municipality : url.searchParams.get('municipality')), req);
+      const requested = url.searchParams.get('municipality');
+      if (user.role === 'staff' && requested && normaliseMunicipality(requested) !== normaliseMunicipality(user.municipality)) return json(res, 403, { error: 'Municipality access denied' }, req);
+      return json(res, 200, await dashboardData(user.role === 'staff' ? user.municipality : requested), req);
+    }
+    if (req.method === 'GET' && url.pathname === '/api/admin/analytics') {
+      const user = requireRole(req, url, ['admin']);
+      if (!user) return json(res, 403, { error: 'Administrator access required' }, req);
+      return json(res, 200, await adminAnalytics(), req);
     }
 
     if (req.method === 'POST' && url.pathname === '/api/users/citizen') {
@@ -200,28 +254,60 @@ const server = http.createServer(async (req, res) => {
       const input = await body(req);
       if (!hasFields(input, ['fullName', 'email', 'password', 'municipality'])) return json(res, 400, { error: 'fullName, email, password, and municipality are required' }, req);
       if (input.password.length < 12) return json(res, 400, { error: 'Staff password must be at least 12 characters' }, req);
-      const result = await query(`INSERT INTO app_users (full_name, email, password_hash, role, municipality, department) VALUES ($1, $2, crypt($3, gen_salt('bf')), 'staff', $4, $5) RETURNING id, full_name, email, role, municipality, department`, [input.fullName, input.email, input.password, input.municipality, input.department || null]);
+      const result = await query(`INSERT INTO app_users (full_name, email, password_hash, role, municipality, department, phone) VALUES ($1, $2, crypt($3, gen_salt('bf')), 'staff', $4, $5, $6) RETURNING id, full_name, email, role, municipality, department, phone`, [input.fullName, input.email, input.password, input.municipality, input.department || null, input.phone || null]);
       return json(res, 201, result.rows[0], req);
     }
 
-    if (req.method === 'POST' && url.pathname === '/api/mobile/reports') {
+    // Password reset. There is no self-service reset mail, so an administrator sets a new
+    // password here when someone forgets or mistypes theirs. Without this a forgotten
+    // password is permanently unrecoverable and the account has to be recreated.
+    const passwordReset = url.pathname.match(/^\/api\/users\/([^/]+)\/password$/);
+    if (req.method === 'PATCH' && passwordReset) {
+      const admin = requireRole(req, url, ['admin']);
+      if (!admin) return json(res, 403, { error: 'Administrator access required' }, req);
       const input = await body(req);
-      if (!hasFields(input, ['externalRef', 'municipality', 'category', 'description', 'location'])) return json(res, 400, { error: 'externalRef, municipality, category, description, and location are required' }, req);
-      const citizen = await query(`INSERT INTO app_users (full_name, email, external_ref, role) VALUES ('Anonymous Citizen', $1, $2, 'citizen') ON CONFLICT (external_ref) DO UPDATE SET updated_at = now() RETURNING id`, [`anonymous-${input.externalRef}@local.invalid`, input.externalRef]);
-      const result = await query(`INSERT INTO service_reports (public_reference, citizen_id, municipality, category, description, location_text, urgency, sla_due_at) VALUES ('MZ-${Date.now()}', $1, $2, $3, $4, $5, $6, now() + interval '48 hours') RETURNING *`, [citizen.rows[0].id, input.municipality, input.category, input.description, input.location, input.urgency || 'medium']);
-      broadcast('report.created', result.rows[0]);
-      return json(res, 201, result.rows[0], req);
+      if (typeof input.password !== 'string' || input.password.length < 12) return json(res, 400, { error: 'New password must be at least 12 characters' }, req);
+      // Allow lookup by id or by email so the admin UI can target either.
+      const target = decodeURIComponent(passwordReset[1]);
+      const isEmail = target.includes('@');
+      const result = await query(`UPDATE app_users SET password_hash = crypt($1, gen_salt('bf')), updated_at = now() WHERE ${isEmail ? 'lower(email) = lower($2)' : 'id::text = $2'} RETURNING id, full_name, email, role`, [input.password, target]);
+      if (!result.rows[0]) return json(res, 404, { error: 'User not found' }, req);
+      return json(res, 200, { ...result.rows[0], passwordUpdated: true }, req);
     }
 
     if (req.method === 'GET' && url.pathname === '/api/reports') {
-      if (!url.searchParams.get('citizenId')) return json(res, 400, { error: 'citizenId is required' }, req);
-      const result = await query('SELECT * FROM service_reports WHERE citizen_id = $1 ORDER BY created_at DESC', [url.searchParams.get('citizenId')]);
+      const externalRef = url.searchParams.get('externalRef');
+      if (!externalRef) return json(res, 400, { error: 'externalRef is required' }, req);
+      const result = await query('SELECT r.*, EXISTS (SELECT 1 FROM report_photos p WHERE p.report_id = r.id) AS has_photo FROM service_reports r JOIN app_users u ON u.id = r.citizen_id WHERE u.external_ref = $1 AND u.role = \'citizen\' ORDER BY r.created_at DESC', [externalRef]);
       return json(res, 200, result.rows, req);
     }
 
+    const reportPhoto = url.pathname.match(/^\/api\/reports\/([0-9a-f-]{36})\/photo$/);
+    if (req.method === 'GET' && reportPhoto) {
+      const externalRef = url.searchParams.get('externalRef');
+      const user = requireRole(req, url, ['staff', 'admin']);
+      if (!externalRef && !user) return json(res, 403, { error: 'Access denied' }, req);
+      const result = await query('SELECT p.content_type, p.data FROM report_photos p JOIN service_reports r ON r.id = p.report_id JOIN app_users u ON u.id = r.citizen_id WHERE p.report_id = $1 AND (($2::text IS NOT NULL AND u.external_ref = $2) OR ($3::text = \'admin\') OR ($3::text = \'staff\' AND normalise_municipality(r.municipality) = normalise_municipality($4)))', [reportPhoto[1], externalRef, user?.role || '', user?.municipality || '']);
+      if (!result.rows[0]) return json(res, 404, { error: 'Photo not found' }, req);
+      res.writeHead(200, { 'content-type': result.rows[0].content_type, 'cache-control': 'private, no-store', ...corsHeaders(req) });
+      return res.end(result.rows[0].data);
+    }
     const reportEvents = url.pathname.match(/^\/api\/reports\/([^/]+)\/events$/);
     if (req.method === 'GET' && reportEvents) {
-      const result = await query('SELECT id, from_status, to_status, changed_by, note, created_at FROM report_status_events WHERE report_id = $1 ORDER BY created_at ASC', [reportEvents[1]]);
+      const identifier = decodeURIComponent(reportEvents[1]);
+      // Older Android clients request events by the human-readable public
+      // reference (e.g. "RPT-...") instead of the database UUID. Accept either
+      // so a valid request is not turned into a 500 by a uuid cast failure.
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identifier);
+      if (!isUuid && !/^[A-Za-z0-9-]{1,64}$/.test(identifier)) return json(res, 400, { error: 'Invalid report reference' }, req);
+      const result = await query(
+        `SELECT e.id, e.from_status, e.to_status, e.changed_by, e.note, e.created_at
+           FROM report_status_events e
+           JOIN service_reports r ON r.id = e.report_id
+          WHERE ${isUuid ? 'r.id = $1::uuid' : 'r.public_reference = $1'}
+          ORDER BY e.created_at ASC`,
+        [identifier]
+      );
       return json(res, 200, result.rows, req);
     }
 
@@ -232,12 +318,46 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && url.pathname === '/api/reports') {
       const input = await body(req);
-      if (!hasFields(input, ['citizenId', 'municipality', 'category', 'description', 'location'])) return json(res, 400, { error: 'citizenId, municipality, category, description, and location are required' }, req);
-      const citizen = await query('SELECT id FROM app_users WHERE id = $1 AND role = $2', [input.citizenId, 'citizen']);
-      if (!citizen.rows[0]) return json(res, 404, { error: 'Citizen identity not found' }, req);
-      const result = await query(`INSERT INTO service_reports (public_reference, citizen_id, municipality, category, description, location_text, latitude, longitude, urgency, sla_due_at) VALUES ('MZ-${Date.now()}', $1, $2, $3, $4, $5, $6, $7, $8, now() + interval '48 hours') RETURNING *`, [input.citizenId, input.municipality, input.category, input.description, input.location, input.latitude || null, input.longitude || null, input.urgency || 'medium']);
-      broadcast('report.created', result.rows[0]);
-      return json(res, 201, result.rows[0], req);
+      if (!hasFields(input, ['municipality', 'category', 'description', 'location'])) return json(res, 400, { error: 'municipality, category, description, and location are required' }, req);
+      const category = await query('SELECT 1 FROM service_categories WHERE name = $1 AND is_active = true', [input.category]);
+      if (!category.rows[0]) return json(res, 400, { error: 'Choose a supported report category' }, req);
+      if (input.issueType) {
+        const issue = await query('SELECT 1 FROM service_issue_types WHERE category = $1 AND label = $2', [input.category, input.issueType]);
+        if (!issue.rows[0]) return json(res, 400, { error: 'Choose an issue matching the category' }, req);
+      }
+      const municipality = await query('SELECT 1 FROM municipalities WHERE name = $1', [input.municipality]);
+      if (!municipality.rows[0]) return json(res, 400, { error: 'Choose a supported municipality' }, req);
+      const photo = input.photo;
+      if (photo !== undefined && (!photo || !['image/jpeg', 'image/png', 'image/webp'].includes(photo.contentType) || typeof photo.base64 !== 'string' || !/^[A-Za-z0-9+/]+={0,2}$/.test(photo.base64) || photo.base64.length > 4_000_000)) return json(res, 400, { error: 'Photo must be a JPEG, PNG or WebP image under 3 MB' }, req);
+      const photoBytes = photo ? Buffer.from(photo.base64, 'base64') : null;
+      if (photoBytes && (photoBytes.length > 3_000_000 || photoBytes.length === 0 || !(photo.contentType === 'image/jpeg' && photoBytes.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff])) || photo.contentType === 'image/png' && photoBytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) || photo.contentType === 'image/webp' && photoBytes.toString('ascii', 0, 4) === 'RIFF' && photoBytes.toString('ascii', 8, 12) === 'WEBP'))) return json(res, 400, { error: 'Invalid photo data' }, req);
+      // The Android client falls back to a null citizenId when identity resolution
+      // fails offline. Resolve or mint an identity instead of rejecting the report,
+      // so a citizen submission is never lost before it reaches the dashboards.
+      let citizenId = input.citizenId;
+      if (citizenId) {
+        const citizen = await query('SELECT id FROM app_users WHERE id = $1 AND role = $2', [citizenId, 'citizen']);
+        if (!citizen.rows[0]) citizenId = null;
+      }
+      if (!citizenId) {
+        const externalRef = typeof input.externalRef === 'string' && input.externalRef.trim() ? input.externalRef.trim() : crypto.randomUUID();
+        const anonymous = await query(`INSERT INTO app_users (full_name, email, external_ref, role) VALUES ('Anonymous Citizen', $1, $2, 'citizen') ON CONFLICT (external_ref) DO UPDATE SET updated_at = now() RETURNING id`, [`anonymous-${externalRef}@local.invalid`, externalRef]);
+        citizenId = anonymous.rows[0].id;
+      }
+      const client = await pool.connect();
+      let saved;
+      try {
+        await client.query('BEGIN');
+        const result = await client.query(`INSERT INTO service_reports (public_reference, citizen_id, municipality, category, description, location_text, latitude, longitude, urgency, sla_due_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now() + interval '48 hours') RETURNING *`, [`MZ-${crypto.randomUUID()}`, citizenId, input.municipality, input.category, input.description, input.location, input.latitude ?? null, input.longitude ?? null, input.urgency || 'medium']);
+        saved = result.rows[0];
+        if (photoBytes) await client.query('INSERT INTO report_photos (report_id, content_type, data) VALUES ($1, $2, $3)', [saved.id, photo.contentType, photoBytes]);
+        await client.query('COMMIT');
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally { client.release(); }
+      broadcast('report.created', saved);
+      return json(res, 201, { ...saved, has_photo: !!photoBytes }, req);
     }
 
     const assignment = url.pathname.match(/^\/api\/reports\/([^/]+)\/assign$/);
@@ -260,7 +380,7 @@ const server = http.createServer(async (req, res) => {
       const input = await body(req);
       if (!validStatuses.has(input.status)) return json(res, 400, { error: 'Invalid report status' }, req);
       const previous = await query('SELECT status FROM service_reports WHERE id = $1', [status[1]]);
-      const result = await query("UPDATE service_reports SET status = $2, resolved_at = CASE WHEN $2 IN ('resolved','closed') THEN now() ELSE NULL END WHERE id = $1 AND ($3 = 'admin' OR municipality = $4) RETURNING *", [status[1], input.status, user.role, user.municipality || '']);
+      const result = await query("UPDATE service_reports SET status = $2, resolved_at = CASE WHEN $2 IN ('resolved','closed') THEN now() ELSE NULL END WHERE id = $1 AND ($3 = 'admin' OR normalise_municipality(municipality) = normalise_municipality($4)) RETURNING *", [status[1], input.status, user.role, user.municipality || '']);
       if (!result.rows[0]) return json(res, 404, { error: 'Report not found' }, req);
       await query('INSERT INTO report_status_events (report_id, from_status, to_status, changed_by, note) VALUES ($1, $2, $3, $4, $5)', [status[1], previous.rows[0]?.status || null, input.status, user.sub, input.note || null]);
       broadcast('report.updated', result.rows[0]);
@@ -274,4 +394,6 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(port, () => console.log(`MzansiConnect API listening on http://localhost:${port}`));
+// Bind to all interfaces so the Android emulator (10.0.2.2) and physical
+// devices on the LAN can reach the API, not just localhost.
+server.listen(port, '0.0.0.0', () => console.log(`MzansiConnect API listening on http://0.0.0.0:${port} (localhost, 10.0.2.2, and LAN IP all reachable)`));

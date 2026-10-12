@@ -23,7 +23,6 @@ public class RegistrationFragment extends Fragment {
         View root = inflater.inflate(R.layout.fragment_registration, container, false);
 
         EditText nameEdit = root.findViewById(R.id.reg_name);
-        EditText idEdit = root.findViewById(R.id.reg_id);
         EditText emailEdit = root.findViewById(R.id.reg_email);
         EditText passEdit = root.findViewById(R.id.reg_pass);
         Button regBtn = root.findViewById(R.id.btn_register);
@@ -35,21 +34,17 @@ public class RegistrationFragment extends Fragment {
 
         regBtn.setOnClickListener(v -> {
             String name = nameEdit.getText().toString();
-            String idNum = idEdit.getText().toString();
             String email = emailEdit.getText().toString();
             String pass = passEdit.getText().toString();
 
-            if (name.isEmpty() || idNum.length() != 13 || email.isEmpty() || pass.isEmpty()) {
-                Toast.makeText(getContext(), "Please fill all fields (13-digit ID)", Toast.LENGTH_SHORT).show();
+            if (name.isEmpty() || email.isEmpty() || pass.isEmpty()) {
+                Toast.makeText(getContext(), "Please complete all required fields.", Toast.LENGTH_SHORT).show();
                 return;
             }
 
             User user = new User();
             user.fullName = name;
-            user.idNumber = idNum;
             user.email = email;
-            user.password = pass;
-
             regBtn.setEnabled(false);
             DataRepository.getInstance(requireContext()).registerUser(user, pass, new DataRepository.RegistrationCallback() {
                 @Override

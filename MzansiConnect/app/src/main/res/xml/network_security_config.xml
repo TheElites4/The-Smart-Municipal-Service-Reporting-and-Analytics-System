@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 9+ blocks cleartext HTTP by default, which silently broke every call
+  to the local development API (http://127.0.0.1:8787 via `adb reverse` or
+  http://<LAN-IP>:8787 over Wi-Fi) — reports appeared to submit but only saved
+  to the local Room database.
+
+  Cleartext stays BLOCKED everywhere else; only the local dev hosts are allowed.
+  For a production build, drop this file and serve the API over HTTPS.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- adb reverse tcp:8787 tcp:8787  (USB) -->
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+        <!-- Android emulator loopback -->
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <!-- Local Wi-Fi / LAN development servers -->
+        <domain includeSubdomains="true">10.3.13.163</domain>
+    </domain-config>
+</network-security-config>

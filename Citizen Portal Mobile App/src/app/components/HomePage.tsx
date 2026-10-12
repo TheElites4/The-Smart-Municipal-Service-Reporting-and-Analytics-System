@@ -140,33 +140,6 @@ export function HomePage({ onGetStarted, onLogin, language, onLanguageChange }: 
         </div>
       </section>
 
-      {/* Stats Section */}
-      <section className="py-16 px-4 bg-gradient-to-br from-[#1e5a7d] to-[#4a8f8f] text-white">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-8">
-            <p className="text-[#FFB612] text-lg font-semibold">{t('trustedBy')}</p>
-          </div>
-          <div className="grid md:grid-cols-4 gap-8 text-center">
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6">
-              <p className="text-4xl font-bold mb-2">15,000+</p>
-              <p className="text-white/90">{t('statsReports')}</p>
-            </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6">
-              <p className="text-4xl font-bold mb-2">12,500+</p>
-              <p className="text-white/90">{t('statsResolved')}</p>
-            </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6">
-              <p className="text-4xl font-bold mb-2">8,000+</p>
-              <p className="text-white/90">{t('statsCitizens')}</p>
-            </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6">
-              <p className="text-4xl font-bold mb-2">85%</p>
-              <p className="text-white/90">{t('statsRate')}</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* About Section */}
       <section id="about" className="py-20 px-4 bg-white">
         <div className="max-w-7xl mx-auto">

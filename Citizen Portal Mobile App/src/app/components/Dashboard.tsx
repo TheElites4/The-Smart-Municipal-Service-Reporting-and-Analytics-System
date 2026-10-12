@@ -6,10 +6,7 @@ import { NotificationCenter } from './NotificationCenter';
 import { SOSButton } from './SOSButton';
 import { LoadSheddingBanner } from './LoadSheddingBanner';
 import { HeroBadge } from './HeroBadge';
-import { ServiceStatusBoard } from './ServiceStatusBoard';
-import { AnalyticsDashboard } from './AnalyticsDashboard';
 import { Leaderboard } from './Leaderboard';
-import { MunicipalityDirectory } from './MunicipalityDirectory';
 import { CitizenAssistant } from './CitizenAssistant';
 import { useTranslation, type Language } from '../utils/i18n';
 
@@ -243,10 +240,7 @@ export function Dashboard({
 
         {/* Advanced Sections */}
         <div className="mt-10 grid md:grid-cols-2 gap-6">
-          <AnalyticsDashboard className="md:col-span-2" />
-          <ServiceStatusBoard />
           <Leaderboard />
-          <MunicipalityDirectory />
         </div>
       </div>
 

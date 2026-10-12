@@ -327,14 +327,7 @@
                     android:layout_marginTop="12dp"
                     app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
 
-                <!-- Embedded modules (mirrors web Advanced Sections) -->
-                <include
-                    android:id="@+id/section_service_status"
-                    layout="@layout/view_service_status_board"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="20dp" />
-
+                <!-- Database-backed leaderboard -->
                 <include
                     android:id="@+id/section_leaderboard"
                     layout="@layout/view_leaderboard"

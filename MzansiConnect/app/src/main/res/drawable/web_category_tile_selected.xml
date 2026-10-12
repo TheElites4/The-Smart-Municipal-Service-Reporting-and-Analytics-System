@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Selected category tile: primary-tinted fill with a stronger primary border -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#141E5A7D" />
+    <corners android:radius="14dp" />
+    <stroke android:width="2dp" android:color="@color/web_primary" />
+</shape>

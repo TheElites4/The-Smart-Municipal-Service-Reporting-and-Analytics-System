@@ -21,7 +21,9 @@ android {
         versionCode = 1
         versionName = "1.0"
         multiDexEnabled = true
-        buildConfigField("String", "API_BASE_URL", "\"${project.findProperty("API_BASE_URL") ?: "http://10.0.2.2:8787/"}\"")
+        // 127.0.0.1 works with `adb reverse tcp:8787 tcp:8787` over USB (no firewall
+        // changes needed). Pass -PAPI_BASE_URL=http://<LAN-IP>:8787/ for Wi-Fi builds.
+        buildConfigField("String", "API_BASE_URL", "\"${project.findProperty("API_BASE_URL") ?: "http://127.0.0.1:8787/"}\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -65,9 +67,8 @@ dependencies {
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
 
-    // UI & Animations (Elite Polish)
+    // UI & Animations
     implementation("com.airbnb.android:lottie:6.1.0")
-    implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
 
     testImplementation("junit:junit:4.13.2")
 }

@@ -24,14 +24,12 @@ public class HomeFragment extends Fragment {
         View root = inflater.inflate(R.layout.fragment_home, container, false);
 
         Button getStarted = root.findViewById(R.id.btn_get_started);
-        Button login = root.findViewById(R.id.btn_home_login);
         View sosCard = root.findViewById(R.id.card_sos);
 
         getStarted.setOnClickListener(v -> Navigation.findNavController(v).navigate(R.id.navigation_dashboard));
-        login.setVisibility(View.GONE);
 
         sosCard.setOnClickListener(v -> {
-            Toast.makeText(getContext(), "Connecting to Emergency Services...", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), "Opening emergency dialer...", Toast.LENGTH_SHORT).show();
             Intent intent = new Intent(Intent.ACTION_DIAL);
             intent.setData(Uri.parse("tel:10111"));
             startActivity(intent);

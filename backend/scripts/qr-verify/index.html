@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>QR encoder verification</title>
+</head>
+<body>
+<div id="host"></div>
+<script src="/Admin%20Dashboard/qrcode.js"></script>
+<script>
+(function () {
+  var uri = new URLSearchParams(location.search).get('uri') ||
+    'otpauth://totp/MzansiConnect:admin@example.com?secret=JBSWY3DPEHPK3PXP&issuer=MzansiConnect&algorithm=SHA1&digits=6&period=30';
+
+  try {
+    var matrix = window.mzansiQr.buildMatrix(uri);
+    var canvas = window.mzansiQr.render(uri, 220);
+    document.getElementById('host').appendChild(canvas);
+
+    var modules = matrix.modules;
+    var size = matrix.size;
+
+    function finderOk(r, c) {
+      for (var i = 0; i < 7; i += 1) {
+        for (var j = 0; j < 7; j += 1) {
+          var border = i === 0 || i === 6 || j === 0 || j === 6;
+          var core = i >= 2 && i <= 4 && j >= 2 && j <= 4;
+          var expected = (border || core) ? 1 : 0;
+          if (modules[r + i][c + j] !== expected) return false;
+        }
+      }
+      return true;
+    }
+
+    var timingOk = true;
+    for (var k = 8; k < size - 8; k += 1) {
+      if (modules[6][k] !== (k % 2 === 0 ? 1 : 0)) timingOk = false;
+      if (modules[k][6] !== (k % 2 === 0 ? 1 : 0)) timingOk = false;
+    }
+
+    var dark = 0;
+    for (var r = 0; r < size; r += 1) {
+      for (var c = 0; c < size; c += 1) if (modules[r][c] === 1) dark += 1;
+    }
+
+    window.__qrResult = {
+      ok: true,
+      uriLength: uri.length,
+      size: size,
+      version: (size - 17) / 4,
+      finderTopLeft: finderOk(0, 0),
+      finderTopRight: finderOk(0, size - 7),
+      finderBottomLeft: finderOk(size - 7, 0),
+      timingPattern: timingOk,
+      darkModule: modules[size - 8][8],
+      canvasWidth: canvas.width,
+      canvasHeight: canvas.height,
+      darkRatio: +(dark / (size * size)).toFixed(3)
+    };
+  } catch (error) {
+    window.__qrResult = { ok: false, error: String((error && error.message) || error) };
+  }
+})();
+</script>
+</body>
+</html>

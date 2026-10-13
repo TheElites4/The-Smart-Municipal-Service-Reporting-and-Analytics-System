@@ -52,39 +52,44 @@ and the password configured during installation. Reset credentials through the
 database administrator or the official PostgreSQL/pgAdmin workflow; do not
 disable password authentication or change localhost rules to `trust`.
 
-The API is intentionally small and explicit. It issues staff/admin dashboard tokens only after password verification and a Firebase email-link sign-in. The API independently validates the Firebase ID token, requires a verified email matching the active account, and binds the proof to a short-lived password challenge. Citizen clients do not use this dashboard MFA flow. Never expose PostgreSQL directly to clients.
+The API is intentionally small and explicit. It issues staff/admin dashboard tokens only after password verification and a TOTP second factor. The API generates and stores the shared secret encrypted, requires a valid 6-digit code from the user's authenticator app, and binds the proof to a short-lived password challenge. Citizen clients do not use this dashboard MFA flow. Never expose PostgreSQL directly to clients.
 
 Dashboard authentication is enforced by the API. Set `AUTH_SECRET` in production; the server refuses to start with the development fallback when `NODE_ENV=production`.
 
-### Firebase MFA for staff/admin dashboards
+### TOTP MFA for staff/admin dashboards (Google Authenticator)
 
-Staff and admin dashboards use **Google Firebase email-link sign-in** for the
-second factor. Firebase MFA applies only to staff/admin dashboard login; citizen
-registration/login and Android push notifications keep their existing flows.
-Set `MFA_PROVIDER=firebase` and `FIREBASE_PROJECT_ID` (for example
-`mzansireport-e01b4`) in `backend/.env`, then restart the API. With Firebase enabled:
+Staff and admin dashboards use **TOTP (RFC 6238)** for the second factor, verified
+with Google Authenticator or any compatible app. TOTP MFA applies only to
+staff/admin dashboard login; citizen registration/login and Android push
+notifications keep their existing flows. No code is ever emailed or texted: the
+shared secret is established once, at enrollment, by scanning a QR code.
+
+Set `MFA_PROVIDER=totp` and `TOTP_ENCRYPTION_KEY` in `backend/.env`, then restart
+the API. Generate a production key with:
+
+```
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+First-time enrollment:
 
 1. `POST /api/auth/login` verifies the password and returns
-   `{ mfaRequired: "firebase-email", mfaToken, firebase: { projectId } }`
-   instead of a dashboard token. The signed challenge expires after ten minutes.
-2. The dashboard uses Firebase `sendSignInLinkToEmail` and
-   `signInWithEmailLink`, then posts the Firebase ID token, account email, and
-   password challenge to `POST /api/auth/firebase-email-verify`.
-3. The API checks the challenge, verifies the ID token's RS256 signature
-   against Google's public certificates and checks `aud`, `iss`, expiry, and
-   `email_verified`, then confirms the verified email matches the active account
-   before issuing the dashboard token.
+   `{ mfaRequired: "totp-enroll", mfaToken }` instead of a dashboard token. The
+   signed challenge expires after ten minutes.
+2. The dashboard calls `POST /api/auth/totp/enroll` with the challenge. The API
+   creates a secret, stores it **encrypted** (AES-256-GCM) but not yet active, and
+   returns the `otpauth://` provisioning URI plus the manual setup key.
+3. The dashboard renders the QR code locally (see `qrcode.js`) and the user scans
+   it with Google Authenticator.
+4. The user enters the 6-digit code. The dashboard posts it to
+   `POST /api/auth/totp/activate`, which validates it and activates MFA.
+5. Activation returns the dashboard token and ten single-use recovery codes.
+   A notification email is sent to the account owner (never the code).
 
-Enable **Email/Password** and its **Email link (passwordless sign-in)** option
-under *Authentication -> Sign-in method* in the Firebase console. The dashboards
-read their web config from the repository-root `firebase-config.js`; `appId`
-must be the Web-app id from the console, not the Android
-`google-services.json` value. Add hosted dashboard domains to
-*Authentication -> Settings -> Authorized domains*; `localhost` is already
-authorized for local development. Firebase sends the link to the email address
-on the active admin/staff account. The user must open the link and complete
-sign-in within ten minutes of entering their password. The email link carries
-the signed short-lived challenge so it can be completed in another browser.
+Returning users call `POST /api/auth/totp/verify` with the challenge and a
+6-digit code, or one recovery code if the phone is lost. Each accepted code
+records its time step, so a code cannot be replayed within its 30-second window.
+The server accepts one step of clock drift either side.
 
 Set `ESKOM_SE_PUSH_TOKEN` from https://developer.sepush.co.za/ in `backend/.env` or in the deployed API's environment to enable live load-shedding lookups. The Render Blueprint declares this as a secret environment variable; enter the token when creating/updating the Render service. The API uses a supplied municipality when available, otherwise reverse-geocodes client coordinates and searches EskomSePush for the matching area. Requests without a location return the provider's national status. The endpoint returns a clear service error when the token is missing/invalid or no area matches; it never invents a stage.
 
@@ -93,7 +98,7 @@ Set `ESKOM_SE_PUSH_TOKEN` from https://developer.sepush.co.za/ in `backend/.env`
 - The Android app posts reports to `POST /api/reports`; the local Room mirror is refreshed only from confirmed PostgreSQL rows.
 - Android identifies the citizen using a stable external reference stored in `app_users.external_ref`.
 - The Android emulator uses `http://10.0.2.2:8787/`; physical devices need a deployed HTTPS API URL in `app/build.gradle.kts`.
-- Existing databases should apply all four migrations before updating clients.
+- Existing databases should apply all migrations (including `007_totp_mfa.sql`) before updating clients.
 
 `GET /api/admin/analytics` is restricted to administrators and aggregates only
 database report rows. `GET /api/options` returns categories and guided issue types from PostgreSQL
@@ -110,14 +115,16 @@ per-category schedule.
 ## API reference
 
 All endpoints are served on port `8787`. Protected staff/admin routes require a
-Protected dashboard routes require a token issued after password and Firebase email-link verification.
+token issued after password and TOTP verification.
 
 | Method | Path | Access | Purpose |
 | --- | --- | --- | --- |
 | `GET` | `/health` | Public | API and PostgreSQL health |
 | `GET` | `/api/options` | Public | Database-backed categories and municipalities |
-| `POST` | `/api/auth/login` | Public | Check password and start Firebase email-link MFA for staff/admin accounts |
-| `POST` | `/api/auth/firebase-email-verify` | Public | Verify the Firebase email ID token and password challenge, then issue the dashboard token |
+| `POST` | `/api/auth/login` | Public | Check password and start TOTP MFA for staff/admin accounts |
+| `POST` | `/api/auth/totp/enroll` | Public | Create a pending TOTP secret and return the QR provisioning URI |
+| `POST` | `/api/auth/totp/activate` | Public | Confirm the first code, activate MFA, return recovery codes and a token |
+| `POST` | `/api/auth/totp/verify` | Public | Verify a code (or recovery code) and issue the dashboard token |
 | `GET` | `/api/dashboard` | Staff/admin | Report queue and workforce summary |
 | `GET` | `/api/admin/analytics` | Admin | Report aggregates from PostgreSQL |
 | `PATCH` | `/api/staff/phone` | Admin | Update a staff account's contact phone number |

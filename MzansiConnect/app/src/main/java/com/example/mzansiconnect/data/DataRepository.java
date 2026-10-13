@@ -125,11 +125,55 @@ public class DataRepository {
         return ref;
     }
 
+    /** Returns the cached PostgreSQL citizen id, if identity resolution has run before. */
+    public String getCachedCitizenId() {
+        return context.getSharedPreferences("mzansi_client", Context.MODE_PRIVATE)
+                .getString("citizenId", null);
+    }
+
+    private void cacheCitizenId(String citizenId) {
+        if (citizenId == null || citizenId.isEmpty() || "null".equals(citizenId)) return;
+        context.getSharedPreferences("mzansi_client", Context.MODE_PRIVATE)
+                .edit().putString("citizenId", citizenId).apply();
+    }
+
+    /** Resolves and caches the citizen identity (id + externalRef) with the API. */
+    private void resolveIdentity(Runnable onResolved) {
+        Map<String, Object> identity = new HashMap<>();
+        identity.put("externalRef", getOrCreateExternalRef());
+        SharedApi.service().resolveAnonymous(identity).enqueue(new Callback<Map<String, Object>>() {
+            @Override
+            public void onResponse(Call<Map<String, Object>> call, Response<Map<String, Object>> response) {
+                if (response.isSuccessful() && response.body() != null) {
+                    cacheCitizenId(String.valueOf(response.body().get("id")));
+                }
+                onResolved.run();
+            }
+
+            @Override
+            public void onFailure(Call<Map<String, Object>> call, Throwable throwable) {
+                onResolved.run();
+            }
+        });
+    }
+
     /** Submit once to the database-backed API; never report success for a local-only copy. */
     public void submitReport(Report report, Map<String, Object> photo, ReportSubmissionCallback callback) {
         final String externalRef = getOrCreateExternalRef();
+        // Make sure the report is attributed to this citizen so the server can fan
+        // the live event back to this device, then post it.
+        if (getCachedCitizenId() == null) {
+            resolveIdentity(() -> postReport(report, photo, callback, externalRef));
+            return;
+        }
+        postReport(report, photo, callback, externalRef);
+    }
+
+    private void postReport(Report report, Map<String, Object> photo, ReportSubmissionCallback callback, String externalRef) {
         Map<String, Object> payload = new HashMap<>();
         payload.put("externalRef", externalRef);
+        String citizenId = getCachedCitizenId();
+        if (citizenId != null) payload.put("citizenId", citizenId);
         payload.put("category", report.category);
         payload.put("description", report.description);
         payload.put("location", report.location);
@@ -182,6 +226,7 @@ public class DataRepository {
                     callback.onFailure("Citizen account is unavailable from the service.");
                     return;
                 }
+                cacheCitizenId(String.valueOf(response.body().get("id")));
                 SharedApi.service().getReports(externalRef).enqueue(new Callback<List<Map<String, Object>>>() {
                     @Override
                     public void onResponse(Call<List<Map<String, Object>>> call, Response<List<Map<String, Object>>> reportsResponse) {

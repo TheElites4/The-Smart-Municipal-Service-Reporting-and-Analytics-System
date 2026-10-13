@@ -131,12 +131,12 @@ async function login(event) {
     return;
   }
 
-  // The password is the first factor; an email link proves inbox access.
-  if (response.ok && result.mfaRequired === 'firebase-email') {
+  // The password is the first factor; the authenticator code is the second.
+  if (response.ok && (result.mfaRequired === 'totp' || result.mfaRequired === 'totp-enroll')) {
     try {
-      await beginFirebaseEmailMfa(result.user.email, result.mfaToken, $('login-form'));
-    } catch {
-      $('auth-error').textContent = 'Could not start email verification. Check Firebase email-link sign-in settings and try again.';
+      await beginTotpMfa(result);
+    } catch (error) {
+      $('auth-error').textContent = totpError(error);
     }
     return;
   }
@@ -158,147 +158,162 @@ async function login(event) {
   }
 }
 
-// --- Firebase email-link MFA (second factor) -------------------------------
-let firebaseAuth;
-let pendingMfaEmail;
+// --- TOTP MFA (second factor, Google Authenticator) -------------------------
+// The password is factor one. Factor two is a 6-digit code the user's
+// authenticator app derives from a shared secret. No code is ever emailed or
+// texted: the secret is shared once, at enrollment, via a QR code.
 let pendingMfaToken;
-const pendingEmailKey = `${TOKEN_KEY}:pendingEmail`;
+let pendingMfaEmail;
+let enrollmentUri;
+let enrollmentSecret;
+let pendingSession;
 const pendingMfaTokenKey = `${TOKEN_KEY}:pendingMfaToken`;
 
-function firebaseMfaAvailable() {
-  return window.MZANSI_FIREBASE_READY && window.firebase && window.MZANSI_FIREBASE_CONFIG?.projectId;
+function totpError(error) {
+  return error instanceof Error ? error.message : 'Could not complete two-factor verification.';
 }
 
-function firebaseEmailError(error) {
-  switch (error?.code) {
-    case 'auth/unauthorized-domain':
-      return 'This dashboard domain is not authorized for Firebase Authentication. Add it under Firebase Authentication settings.';
-    case 'auth/operation-not-allowed':
-      return 'Firebase email-link sign-in is disabled. Enable Email/Password and email-link sign-in in Firebase Authentication.';
-    case 'auth/too-many-requests':
-      return 'Firebase temporarily limited verification emails. Wait before requesting another link.';
-    case 'auth/quota-exceeded':
-      return 'The Firebase email quota has been reached. Check the project limits.';
-    case 'auth/invalid-action-code':
-    case 'auth/expired-action-code':
-      return 'This verification link has expired or was already used. Sign in again to request a new link.';
-    case 'auth/invalid-email':
-      return 'Firebase rejected the account email address. Check the email on the dashboard account.';
-    default:
-      return error?.message || 'Could not send or verify the email link.';
-  }
-}
-
-async function beginFirebaseEmailMfa(email, mfaToken, loginForm) {
-  if (!firebaseMfaAvailable()) {
-    throw new Error('Firebase web configuration is incomplete. Check firebase-config.js.');
-  }
-  if (typeof mfaToken !== 'string' || !mfaToken) {
-    throw new Error('Password verification expired. Sign in again to request a new email link.');
-  }
-  pendingMfaEmail = email;
-  pendingMfaToken = mfaToken;
-  if (!firebaseAuth) firebaseAuth = firebase.auth();
-  sessionStorage.setItem(pendingEmailKey, email);
-  sessionStorage.setItem(pendingMfaTokenKey, mfaToken);
-  $('mfa-email').value = email;
-  $('mfa-email').readOnly = true;
-  loginForm.hidden = true;
+function showMfaForm() {
+  $('login-form').hidden = true;
   $('mfa-form').hidden = false;
   $('mfa-error').textContent = '';
-  $('mfa-form').querySelector('.mfa-hint').textContent = `We’ll email a secure sign-in link to ${email}. Open it in this browser to finish signing in.`;
-  await sendFirebaseEmailLink();
 }
 
-async function sendFirebaseEmailLink() {
-  const email = pendingMfaEmail || $('mfa-email').value.trim();
-  if (!email) { $('mfa-error').textContent = 'Enter the account email address.'; return; }
-  if (!firebaseAuth) firebaseAuth = firebase.auth();
-  const send = $('mfa-send');
-  send.disabled = true;
-  $('mfa-error').textContent = '';
-  try {
-    firebaseAuth.languageCode = 'en';
-    const returnUrl = new URL(location.pathname, location.origin);
-    returnUrl.searchParams.set('mfaToken', pendingMfaToken);
-    await firebaseAuth.sendSignInLinkToEmail(email, {
-      url: returnUrl.href,
-      handleCodeInApp: true,
-    });
-    pendingMfaEmail = email;
-    sessionStorage.setItem(pendingEmailKey, email);
-    $('mfa-email').value = email;
-    $('mfa-email').readOnly = true;
-    send.textContent = 'Resend email link';
-    $('mfa-form').querySelector('.mfa-hint').textContent = `Verification link sent to ${email}. Check your inbox and spam folder, then open it in this browser.`;
-  } catch (error) {
-    $('mfa-error').textContent = firebaseEmailError(error);
-  } finally {
-    send.disabled = false;
+/** Render the enrollment view: QR code, manual key, and the confirm field. */
+function showEnrollment(uri, secret) {
+  if (typeof uri !== 'string' || !uri.startsWith('otpauth://totp/') || typeof secret !== 'string' || !secret) {
+    throw new Error('The authenticator setup details were incomplete. Sign in again to restart setup.');
   }
+  enrollmentUri = uri;
+  enrollmentSecret = secret;
+  $('mfa-enroll').hidden = false;
+  $('mfa-hint').textContent = 'Scan this QR code with Google Authenticator, then enter the 6-digit code it shows.';
+  $('mfa-manual-key').value = secret;
+  $('mfa-copy-status').textContent = '';
+  // Render the QR locally so the secret is never sent to a third-party service.
+  const qr = $('mfa-qr');
+  qr.innerHTML = '';
+  try {
+    qr.appendChild(makeQrCode(uri));
+  } catch {
+    qr.textContent = 'QR rendering unavailable. Enter the setup key below manually.';
+  }
+  $('mfa-code').value = '';
+  $('mfa-code').focus();
 }
 
-async function completeFirebaseEmailLink(email) {
-  if (!firebaseAuth) firebaseAuth = firebase.auth();
-  const mfaToken = pendingMfaToken || getMfaTokenFromLink();
-  if (!mfaToken) {
-    $('mfa-error').textContent = 'Password verification expired. Go back and sign in again before opening a new email link.';
-    return;
-  }
-  const button = $('mfa-send');
-  button.disabled = true;
-  $('mfa-error').textContent = '';
-  try {
-    const credential = await firebaseAuth.signInWithEmailLink(email, location.href);
-    const idToken = await credential.user.getIdToken();
-    const response = await fetch(`${API}/api/auth/firebase-email-verify`, {
+/** Render the returning-user view: just the code field. */
+function showVerify() {
+  $('mfa-enroll').hidden = true;
+  $('mfa-hint').textContent = `Enter the 6-digit code from your authenticator app for ${pendingMfaEmail || 'your account'}.`;
+  $('mfa-code').value = '';
+  $('mfa-code').focus();
+}
+
+async function beginTotpMfa(result) {
+  pendingMfaToken = result.mfaToken;
+  pendingMfaEmail = result.user?.email || '';
+  sessionStorage.setItem(pendingMfaTokenKey, pendingMfaToken);
+  showMfaForm();
+  if (result.mfaRequired === 'totp-enroll') {
+    const response = await fetch(`${API}/api/auth/totp/enroll`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email, idToken, mfaToken }),
+      body: JSON.stringify({ mfaToken: pendingMfaToken }),
+    });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error || 'Could not start authenticator setup.');
+    showEnrollment(body.otpauthUri, body.secret);
+    return;
+  }
+  showVerify();
+}
+
+/** Submit a 6-digit code: activate on first enrollment, verify thereafter. */
+async function submitTotpCode() {
+  const code = $('mfa-code').value.replace(/\s+/g, '');
+  if (!/^\d{6}$/.test(code)) {
+    $('mfa-error').textContent = 'Enter the 6-digit code from your authenticator app.';
+    return;
+  }
+  const enrolling = !$('mfa-enroll').hidden;
+  const endpoint = enrolling ? '/api/auth/totp/activate' : '/api/auth/totp/verify';
+  const submit = $('mfa-submit');
+  submit.disabled = true;
+  $('mfa-error').textContent = '';
+  try {
+    const response = await fetch(`${API}${endpoint}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ mfaToken: pendingMfaToken, code }),
     });
     const result = await response.json();
     if (!response.ok || result.user?.role !== 'admin') {
-      $('mfa-error').textContent = result.error || 'Email verification failed.';
+      $('mfa-error').textContent = result.error || 'That code was not accepted.';
       return;
     }
-    sessionStorage.removeItem(pendingEmailKey);
     sessionStorage.removeItem(pendingMfaTokenKey);
     pendingMfaToken = null;
-    await firebaseAuth.signOut();
-    history.replaceState({}, document.title, `${location.pathname}${location.hash}`);
+    if (Array.isArray(result.recoveryCodes) && result.recoveryCodes.length) {
+      // Hold the session until the user has acknowledged the recovery codes.
+      pendingSession = result;
+      showRecoveryCodes(result.recoveryCodes);
+      return;
+    }
     await completeLogin(result);
   } catch (error) {
-    $('mfa-error').textContent = firebaseEmailError(error);
+    $('mfa-error').textContent = totpError(error);
   } finally {
-    button.disabled = false;
+    submit.disabled = false;
   }
+}
+
+async function copyTotpSetupKey() {
+  const input = $('mfa-manual-key');
+  input.focus();
+  input.select();
+  try {
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(input.value);
+      } catch {
+        if (!document.execCommand('copy')) throw new Error('Clipboard copy failed.');
+      }
+    } else if (!document.execCommand('copy')) {
+      throw new Error('Clipboard copy is unavailable.');
+    }
+    $('mfa-copy-status').textContent = 'Setup key copied.';
+  } catch {
+    $('mfa-copy-status').textContent = 'Copy failed. Select the setup key and copy it manually.';
+  }
+}
+
+/** Recovery codes are shown exactly once, at enrollment, to be written down. */
+function showRecoveryCodes(codes) {
+  $('mfa-enroll').hidden = true;
+  $('mfa-recovery').hidden = false;
+  $('mfa-hint').textContent = 'Save these recovery codes somewhere safe. Each works once if you lose your phone.';
+  $('mfa-recovery-list').innerHTML = codes.map((code) => `<code>${esc(code)}</code>`).join('');
+}
+
+// Render the otpauth URI locally so the shared secret never leaves this page
+// and enrollment works on an offline municipal network (see qrcode.js).
+function makeQrCode(text) {
+  if (window.mzansiQr && typeof window.mzansiQr.render === 'function') {
+    return window.mzansiQr.render(text, 220);
+  }
+  const fallback = document.createElement('div');
+  fallback.className = 'mfa-qr-fallback';
+  fallback.textContent = 'QR rendering unavailable — use the setup key below.';
+  return fallback;
 }
 
 function getMfaTokenFromLink() {
   try {
-    const params = new URL(location.href).searchParams;
-    const directToken = params.get('mfaToken');
-    if (directToken) return directToken;
-    const continueUrl = params.get('continueUrl');
-    return continueUrl ? new URL(continueUrl).searchParams.get('mfaToken') : null;
+    return new URL(location.href).searchParams.get('mfaToken');
   } catch {
     return null;
   }
-}
-
-async function handleFirebaseEmailLink() {
-  if (!firebaseMfaAvailable() || !firebase.auth().isSignInWithEmailLink(location.href)) return;
-  firebaseAuth = firebase.auth();
-  const storedEmail = sessionStorage.getItem(pendingEmailKey);
-  pendingMfaToken = sessionStorage.getItem(pendingMfaTokenKey) || getMfaTokenFromLink();
-  $('login-form').hidden = true;
-  $('mfa-form').hidden = false;
-  $('mfa-email').value = storedEmail || '';
-  $('mfa-email').readOnly = Boolean(storedEmail);
-  $('mfa-form').querySelector('.mfa-hint').textContent = storedEmail
-    ? 'Verifying your email sign-in link…'
-    : 'Enter the same account email that received this link.';
-  if (storedEmail) await completeFirebaseEmailLink(storedEmail);
 }
 
 async function completeLogin(result) {
@@ -382,22 +397,27 @@ function connectLive() {
 $('login-form').addEventListener('submit', login);
 
 if ($('mfa-form')) {
-  $('mfa-send').addEventListener('click', () => {
-    if (firebaseMfaAvailable() && firebase.auth().isSignInWithEmailLink(location.href)) {
-      const email = $('mfa-email').value.trim();
-      if (!email) {
-        $('mfa-error').textContent = 'Enter the same account email that received this link.';
-        return;
-      }
-      completeFirebaseEmailLink(email);
+  // Submit on the button and on Enter inside the code field.
+  $('mfa-submit').addEventListener('click', submitTotpCode);
+  $('mfa-copy-key').addEventListener('click', copyTotpSetupKey);
+  $('mfa-code').addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') { event.preventDefault(); submitTotpCode(); }
+  });
+  $('mfa-continue').addEventListener('click', async () => {
+    if (!pendingSession) {
+      $('auth-error').textContent = 'Session expired. Sign in again.';
       return;
     }
-    sendFirebaseEmailLink();
+    const result = pendingSession;
+    pendingSession = null;
+    await completeLogin(result);
   });
   $('mfa-back').addEventListener('click', () => {
-    sessionStorage.removeItem(pendingEmailKey);
-    pendingMfaEmail = null;
+    sessionStorage.removeItem(pendingMfaTokenKey);
+    pendingMfaToken = null;
     $('mfa-form').hidden = true;
+    $('mfa-enroll').hidden = true;
+    $('mfa-recovery').hidden = true;
     $('login-form').hidden = false;
     $('mfa-error').textContent = '';
   });
@@ -431,9 +451,7 @@ staffForm.addEventListener('submit', async (event) => {
   }
 });
 $('refresh').onclick = () => { const button = $('refresh'); button.disabled = true; load().then(() => toast('Dashboard refreshed')).catch(() => { $('health').textContent = 'Offline'; toast('Could not reach the API', true); }).finally(() => { button.disabled = false; }); };
-if (firebaseMfaAvailable() && firebase.auth().isSignInWithEmailLink(location.href)) {
-  handleFirebaseEmailLink().catch((error) => { $('mfa-error').textContent = firebaseEmailError(error); });
-} else if (localStorage.getItem(TOKEN_KEY)) {
+if (localStorage.getItem(TOKEN_KEY)) {
   $('auth-screen').hidden = true;
   $('app-shell').hidden = false;
   load().then(connectLive).catch(showLogin);

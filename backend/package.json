@@ -9,7 +9,8 @@
     "check:deployment": "node scripts/check-deployment.mjs",
     "test:municipalities": "node --test --test-reporter=dot test/municipalities.test.mjs",
     "test:staff-phone": "node --test test/staff-phone-api.test.mjs",
-    "test:auth-email-mfa": "node --test test/auth-email-mfa.test.mjs",
+    "test:totp": "node --test test/totp.test.mjs",
+    "test:auth-totp-mfa": "node --test test/auth-totp-mfa.test.mjs",
     "setup:database": "node scripts/setup-database.mjs",
     "import:municipalities": "node scripts/import-municipalities.mjs"
   },

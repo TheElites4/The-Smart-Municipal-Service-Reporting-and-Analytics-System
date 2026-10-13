@@ -26,14 +26,25 @@ public class HomeFragment extends Fragment {
         Button getStarted = root.findViewById(R.id.btn_get_started);
         View sosCard = root.findViewById(R.id.card_sos);
 
-        getStarted.setOnClickListener(v -> Navigation.findNavController(v).navigate(R.id.navigation_dashboard));
+        if (getStarted != null) {
+            getStarted.setOnClickListener(v -> {
+                androidx.navigation.NavController controller = Navigation.findNavController(v);
+                if (controller.getCurrentDestination() != null
+                        && controller.getCurrentDestination().getId() == R.id.navigation_dashboard) {
+                    return;
+                }
+                controller.navigate(R.id.navigation_dashboard);
+            });
+        }
 
-        sosCard.setOnClickListener(v -> {
-            Toast.makeText(getContext(), "Opening emergency dialer...", Toast.LENGTH_SHORT).show();
-            Intent intent = new Intent(Intent.ACTION_DIAL);
-            intent.setData(Uri.parse("tel:10111"));
-            startActivity(intent);
-        });
+        if (sosCard != null) {
+            sosCard.setOnClickListener(v -> {
+                Toast.makeText(getContext(), "Opening emergency dialer...", Toast.LENGTH_SHORT).show();
+                Intent intent = new Intent(Intent.ACTION_DIAL);
+                intent.setData(Uri.parse("tel:10111"));
+                startActivity(intent);
+            });
+        }
 
         View langEn = root.findViewById(R.id.btn_lang_en);
         View langZu = root.findViewById(R.id.btn_lang_zu);

@@ -91,7 +91,7 @@ public class DashboardFragment extends Fragment {
         View community = root.findViewById(R.id.btn_community_feed);
         if (community != null) {
             community.setOnClickListener(v ->
-                    Navigation.findNavController(v).navigate(R.id.navigation_community_feed));
+                    Navigation.findNavController(v).navigate(R.id.action_dashboard_to_community));
         }
 
         ImageButton logout = root.findViewById(R.id.btn_dashboard_logout);
@@ -142,22 +142,33 @@ public class DashboardFragment extends Fragment {
 
     private void fetchStatusForLocation(double lat, double lng) {
         if (getContext() == null) return;
-        String suburb = null;
-        String municipality = null;
-        try {
-            android.location.Geocoder geocoder = new android.location.Geocoder(requireContext(), java.util.Locale.getDefault());
-            List<android.location.Address> addresses = geocoder.getFromLocation(lat, lng, 1);
-            if (addresses != null && !addresses.isEmpty()) {
-                android.location.Address addr = addresses.get(0);
-                suburb = addr.getSubLocality() != null ? addr.getSubLocality() : (addr.getLocality() != null ? addr.getLocality() : addr.getAdminArea());
-                municipality = addr.getLocality() != null ? addr.getLocality() : addr.getAdminArea();
+        // Geocoder.getFromLocation is a blocking network call on many devices, so it
+        // must run off the main thread or it throws NetworkOnMainThreadException and
+        // the whole load-shedding lookup silently falls back to "unavailable".
+        final android.content.Context appContext = requireContext().getApplicationContext();
+        new Thread(() -> {
+            String suburb = null;
+            String municipality = null;
+            try {
+                android.location.Geocoder geocoder = new android.location.Geocoder(appContext, java.util.Locale.getDefault());
+                List<android.location.Address> addresses = geocoder.getFromLocation(lat, lng, 1);
+                if (addresses != null && !addresses.isEmpty()) {
+                    android.location.Address addr = addresses.get(0);
+                    suburb = addr.getSubLocality() != null ? addr.getSubLocality() : (addr.getLocality() != null ? addr.getLocality() : addr.getAdminArea());
+                    municipality = addr.getLocality() != null ? addr.getLocality() : addr.getAdminArea();
+                }
+            } catch (Exception e) {
+                // Geocoder fallback - the API can still resolve the area from coordinates.
             }
-        } catch (Exception e) {
-            // Geocoder fallback
-        }
+            final String resolvedMunicipality = municipality;
+            final String areaName = (suburb != null ? suburb : (municipality != null ? municipality : "Current Location"));
+            if (getActivity() == null) return;
+            getActivity().runOnUiThread(() -> requestStatus(lat, lng, resolvedMunicipality, areaName));
+        }).start();
+    }
 
-        final String areaName = (suburb != null ? suburb : (municipality != null ? municipality : "Current Location"));
-
+    private void requestStatus(double lat, double lng, String municipality, String areaName) {
+        if (!isAdded() || loadSheddingDetail == null) return;
         SharedApi.service().getLocationStatus(String.valueOf(lat), String.valueOf(lng), municipality).enqueue(new Callback<Map<String, Object>>() {
             @Override
             public void onResponse(Call<Map<String, Object>> call, Response<Map<String, Object>> response) {

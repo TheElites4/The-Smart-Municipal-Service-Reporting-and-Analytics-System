@@ -6,7 +6,7 @@ The shared system of record for the citizen portal, Android client, staff operat
 
 1. Create a PostgreSQL database and set `DATABASE_URL`.
 2. Apply `schema.sql`, then migrations `002_external_ref.sql`, `003_normalise_municipality.sql`, `004_mfa_challenges.sql`, `005_service_categories.sql`, and `006_municipalities_and_photos.sql`.
-3. Copy `.env.example` to `.env`, configure a unique `AUTH_SECRET`, enable Firebase Email/Password email-link sign-in, and ensure each staff/admin account has a reachable email address. Then run `npm.cmd install`, `npm.cmd run check`, and `./start-local.ps1` on Windows.
+3. Copy `.env.example` to `.env`, configure a unique `AUTH_SECRET`, `SMTP_USER`, `SMTP_APP_PASSWORD`, and ensure each staff/admin account has a reachable email address. Then run `npm.cmd install`, `npm.cmd run check`, and `./start-local.ps1` on Windows.
 4. Import the 257 municipality records into the new table: `npm.cmd run import:municipalities`. The importer aborts unless it reads exactly 8 metropolitan, 44 district, and 205 local municipalities; it does not silently publish a partial list.
 
 Run `npm.cmd run test:municipalities` with the local API and database running to
@@ -52,44 +52,23 @@ and the password configured during installation. Reset credentials through the
 database administrator or the official PostgreSQL/pgAdmin workflow; do not
 disable password authentication or change localhost rules to `trust`.
 
-The API is intentionally small and explicit. It issues staff/admin dashboard tokens only after password verification and a TOTP second factor. The API generates and stores the shared secret encrypted, requires a valid 6-digit code from the user's authenticator app, and binds the proof to a short-lived password challenge. Citizen clients do not use this dashboard MFA flow. Never expose PostgreSQL directly to clients.
+The API issues staff/admin dashboard tokens only after password verification and a one-time email code. Codes are HMAC-hashed in PostgreSQL, expire after five minutes, are single-use, and allow at most five attempts. Citizen clients do not use this dashboard MFA flow. Never expose PostgreSQL directly to clients.
 
 Dashboard authentication is enforced by the API. Set `AUTH_SECRET` in production; the server refuses to start with the development fallback when `NODE_ENV=production`.
 
-### TOTP MFA for staff/admin dashboards (Google Authenticator)
+### Email OTP MFA for staff/admin dashboards
 
-Staff and admin dashboards use **TOTP (RFC 6238)** for the second factor, verified
-with Google Authenticator or any compatible app. TOTP MFA applies only to
-staff/admin dashboard login; citizen registration/login and Android push
-notifications keep their existing flows. No code is ever emailed or texted: the
-shared secret is established once, at enrollment, by scanning a QR code.
+Configure `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=465`, `SMTP_SECURE=true`,
+`SMTP_USER`, and `SMTP_APP_PASSWORD` in `backend/.env`. The app password is
+created after enabling 2-Step Verification on the Google account; do not use its
+regular password. `SMTP_FROM` is optional and defaults to `SMTP_USER`.
 
-Set `MFA_PROVIDER=totp` and `TOTP_ENCRYPTION_KEY` in `backend/.env`, then restart
-the API. Generate a production key with:
-
-```
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-```
-
-First-time enrollment:
-
-1. `POST /api/auth/login` verifies the password and returns
-   `{ mfaRequired: "totp-enroll", mfaToken }` instead of a dashboard token. The
-   signed challenge expires after ten minutes.
-2. The dashboard calls `POST /api/auth/totp/enroll` with the challenge. The API
-   creates a secret, stores it **encrypted** (AES-256-GCM) but not yet active, and
-   returns the `otpauth://` provisioning URI plus the manual setup key.
-3. The dashboard renders the QR code locally (see `qrcode.js`) and the user scans
-   it with Google Authenticator.
-4. The user enters the 6-digit code. The dashboard posts it to
-   `POST /api/auth/totp/activate`, which validates it and activates MFA.
-5. Activation returns the dashboard token and ten single-use recovery codes.
-   A notification email is sent to the account owner (never the code).
-
-Returning users call `POST /api/auth/totp/verify` with the challenge and a
-6-digit code, or one recovery code if the phone is lost. Each accepted code
-records its time step, so a code cannot be replayed within its 30-second window.
-The server accepts one step of clock drift either side.
+After validating a staff/admin password, `POST /api/auth/login` sends a
+six-digit code to the account email and returns `{ mfaRequired: "email-otp",
+mfaToken }`, never a dashboard token. The short-lived challenge is bound to a
+database record. `POST /api/auth/email/verify` checks and consumes the code
+before issuing the dashboard token. SMTP failures are surfaced explicitly and
+do not permit password-only access. Citizen login is unchanged.
 
 Set `ESKOM_SE_PUSH_TOKEN` from https://developer.sepush.co.za/ in `backend/.env` or in the deployed API's environment to enable live load-shedding lookups. The Render Blueprint declares this as a secret environment variable; enter the token when creating/updating the Render service. The API uses a supplied municipality when available, otherwise reverse-geocodes client coordinates and searches EskomSePush for the matching area. Requests without a location return the provider's national status. The endpoint returns a clear service error when the token is missing/invalid or no area matches; it never invents a stage.
 
@@ -115,16 +94,14 @@ per-category schedule.
 ## API reference
 
 All endpoints are served on port `8787`. Protected staff/admin routes require a
-token issued after password and TOTP verification.
+token issued after password and email OTP verification.
 
 | Method | Path | Access | Purpose |
 | --- | --- | --- | --- |
 | `GET` | `/health` | Public | API and PostgreSQL health |
 | `GET` | `/api/options` | Public | Database-backed categories and municipalities |
-| `POST` | `/api/auth/login` | Public | Check password and start TOTP MFA for staff/admin accounts |
-| `POST` | `/api/auth/totp/enroll` | Public | Create a pending TOTP secret and return the QR provisioning URI |
-| `POST` | `/api/auth/totp/activate` | Public | Confirm the first code, activate MFA, return recovery codes and a token |
-| `POST` | `/api/auth/totp/verify` | Public | Verify a code (or recovery code) and issue the dashboard token |
+| `POST` | `/api/auth/login` | Public | Check password and email a verification code for staff/admin accounts |
+| `POST` | `/api/auth/email/verify` | Public | Verify a one-time email code and issue the dashboard token |
 | `GET` | `/api/dashboard` | Staff/admin | Report queue and workforce summary |
 | `GET` | `/api/admin/analytics` | Admin | Report aggregates from PostgreSQL |
 | `PATCH` | `/api/staff/phone` | Admin | Update a staff account's contact phone number |

@@ -23,12 +23,9 @@ server-sent event. Staff and admin clients reload from `GET /api/dashboard`;
 citizen clients reload by stable external reference. Android stores a local
 mirror only after the API confirms a report. The API owns the SLA deadline.
 
-Staff/admin login is password plus **Google Firebase email-link verification**.
-Only those dashboards use this MFA flow; citizen sign-in and Android push
-notifications remain separate. The Firebase Web app config is in
-`firebase-config.js`, and the API checks the verified email against the
-staff/admin account and its short-lived password challenge before issuing a
-dashboard token.
+Staff/admin login requires a password and a **one-time code sent by Gmail SMTP**
+to the account's email address. Only those dashboards use this MFA flow;
+citizen sign-in and Android push notifications remain separate.
 
 ## Verification
 
@@ -44,13 +41,14 @@ Set-Location ..\MzansiConnect
 .\gradlew.bat :app:assembleDebug
 ```
 
-The API package currently has no automated test suite; use `npm.cmd run check`
-for its syntax gate.
+Use `npm.cmd run check` in `backend` for the API syntax gate, and
+`npm.cmd run test:auth-email-mfa` to verify emailed-code login for staff/admin
+against a local test SMTP server and database.
 
 ## Start the local system
 
-For Windows instructions to initialize PostgreSQL, configure Firebase MFA for
-staff/admin dashboards, start each app, and build the Android client, see
+For Windows instructions to initialize PostgreSQL, configure Gmail SMTP email
+OTP for staff/admin dashboards, start each app, and build the Android client, see
 [DEPLOYMENT.md](DEPLOYMENT.md). The guide uses PowerShell, Node.js, PostgreSQL,
 and Docker commands directly; no AI tools are required.
 

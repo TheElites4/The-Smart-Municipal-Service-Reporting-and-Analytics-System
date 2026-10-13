@@ -34,8 +34,8 @@ psql $env:DATABASE_URL -f backend/seed.sql
    resets the seeded account passwords.
 
 2. Copy `backend/.env.example` to `backend/.env`. Configure a long random
-   `AUTH_SECRET`, the same `DATABASE_URL`, Firebase email-link sign-in as described
-   below, and local browser origins:
+   `AUTH_SECRET`, the same `DATABASE_URL`, Gmail SMTP using an App Password as
+   described below, and local browser origins:
 
 ```text
 ALLOWED_ORIGINS=http://localhost:5173,http://localhost:8080
@@ -92,33 +92,24 @@ as offline submissions.
    enabled. See the detailed device notes below. For the mobile browser on a
    different device, configure the API host and allowed origin for the LAN.
 
-## Real staff/admin MFA
-Staff/admin dashboard login uses **Google Firebase email-link sign-in** as
-the second factor. Firebase MFA only applies to those dashboard accounts;
-citizen registration and Android push notifications keep their existing flows.
-The Render Blueprint enables Firebase MFA for project `mzansireport-e01b4`.
-For local setup, enable email-link sign-in in Firebase and check the Web app
-configuration in the repository-root `firebase-config.js`.
+## Email OTP for staff/admin MFA
+Staff and admin dashboard login requires a password followed by a one-time code
+sent to the account's registered email address. Citizen sign-in and Android
+push notifications are unchanged. Codes expire after five minutes, are
+single-use, and are limited to five verification attempts. A new code can be
+requested once per minute.
 
-In `backend/.env`, set `MFA_PROVIDER=firebase` and
-`FIREBASE_PROJECT_ID=mzansireport-e01b4`, then restart the API. To validate
-those values from PowerShell:
+For Gmail SMTP, enable **2-Step Verification** on the sending Google account,
+then create an **App Password** from Google Account security settings. Use that
+generated app password, not the account's normal password. Add the following
+settings to `backend/.env` and restart the API:
 
-```powershell
-Set-Location backend
-$env:MFA_PROVIDER = 'firebase'
-$env:FIREBASE_PROJECT_ID = 'mzansireport-e01b4'
-npm.cmd run check:deployment
-Remove-Item Env:MFA_PROVIDER,Env:FIREBASE_PROJECT_ID
-```
-
-Ensure every existing staff/admin account has a real, reachable email address.
-The seeded `example.gov.za` addresses are placeholders; replace the initial
-admin account email in PostgreSQL before the first dashboard login.
-For example:
-
-```powershell
-psql $env:DATABASE_URL -c "UPDATE app_users SET email='admin@your-real-domain.za' WHERE email='admin@example.gov.za';"
+```text
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=your-account@gmail.com
+SMTP_APP_PASSWORD=your-16-character-app-password
 ```
 
 Use the new email as the admin login. Update the seeded staff account too, or

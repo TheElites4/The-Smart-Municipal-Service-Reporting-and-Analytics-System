@@ -25,10 +25,10 @@ services:
         fromDatabase:
           name: mzansi-connect-db
           property: connectionString
-      - key: MFA_PROVIDER
-        value: firebase
-      - key: FIREBASE_PROJECT_ID
-        value: mzansireport-e01b4
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_APP_PASSWORD
+        sync: false
       - key: ESKOM_SE_PUSH_TOKEN
         sync: false
       - key: ALLOWED_ORIGINS

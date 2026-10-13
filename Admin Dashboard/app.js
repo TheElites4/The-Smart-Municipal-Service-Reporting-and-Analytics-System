@@ -1,6 +1,10 @@
 const API = localStorage.getItem('mzansiApiUrl') || (['localhost', '127.0.0.1'].includes(location.hostname) ? 'http://localhost:8787' : window.MZANSI_API_URL || 'http://localhost:8787');
 const TOKEN_KEY = 'mzansiAdminToken';
 const $ = (id) => document.getElementById(id);
+if ($('mfa-hint')) $('mfa-hint').textContent = 'Enter the one-time code we sent to your email.';
+if ($('mfa-code')) $('mfa-code').closest('label').firstChild.textContent = 'Email verification code';
+if ($('mfa-enroll')) $('mfa-enroll').remove();
+if ($('mfa-recovery')) $('mfa-recovery').remove();
 let liveConnection;
 const authHeaders = (json = false) => ({ ...(json ? { 'content-type': 'application/json' } : {}), authorization: `Bearer ${localStorage.getItem(TOKEN_KEY) || ''}` });
 const analyticsPanel = document.createElement('section');
@@ -131,12 +135,11 @@ async function login(event) {
     return;
   }
 
-  // The password is the first factor; the authenticator code is the second.
-  if (response.ok && (result.mfaRequired === 'totp' || result.mfaRequired === 'totp-enroll')) {
+  if (response.ok && result.mfaRequired === 'email-otp') {
     try {
-      await beginTotpMfa(result);
+      beginEmailMfa(result);
     } catch (error) {
-      $('auth-error').textContent = totpError(error);
+      $('auth-error').textContent = emailOtpError(error);
     }
     return;
   }
@@ -158,91 +161,36 @@ async function login(event) {
   }
 }
 
-// --- TOTP MFA (second factor, Google Authenticator) -------------------------
-// The password is factor one. Factor two is a 6-digit code the user's
-// authenticator app derives from a shared secret. No code is ever emailed or
-// texted: the secret is shared once, at enrollment, via a QR code.
+// Password is factor one; the emailed one-time code is factor two.
 let pendingMfaToken;
 let pendingMfaEmail;
-let enrollmentUri;
-let enrollmentSecret;
-let pendingSession;
-const pendingMfaTokenKey = `${TOKEN_KEY}:pendingMfaToken`;
 
-function totpError(error) {
+function emailOtpError(error) {
   return error instanceof Error ? error.message : 'Could not complete two-factor verification.';
 }
 
-function showMfaForm() {
+function beginEmailMfa(result) {
+  pendingMfaToken = result.mfaToken;
+  pendingMfaEmail = result.user?.email || '';
   $('login-form').hidden = true;
   $('mfa-form').hidden = false;
   $('mfa-error').textContent = '';
-}
-
-/** Render the enrollment view: QR code, manual key, and the confirm field. */
-function showEnrollment(uri, secret) {
-  if (typeof uri !== 'string' || !uri.startsWith('otpauth://totp/') || typeof secret !== 'string' || !secret) {
-    throw new Error('The authenticator setup details were incomplete. Sign in again to restart setup.');
-  }
-  enrollmentUri = uri;
-  enrollmentSecret = secret;
-  $('mfa-enroll').hidden = false;
-  $('mfa-hint').textContent = 'Scan this QR code with Google Authenticator, then enter the 6-digit code it shows.';
-  $('mfa-manual-key').value = secret;
-  $('mfa-copy-status').textContent = '';
-  // Render the QR locally so the secret is never sent to a third-party service.
-  const qr = $('mfa-qr');
-  qr.innerHTML = '';
-  try {
-    qr.appendChild(makeQrCode(uri));
-  } catch {
-    qr.textContent = 'QR rendering unavailable. Enter the setup key below manually.';
-  }
+  $('mfa-hint').textContent = `We sent a 6-digit sign-in code to ${pendingMfaEmail || 'your email address'}.`;
   $('mfa-code').value = '';
   $('mfa-code').focus();
 }
 
-/** Render the returning-user view: just the code field. */
-function showVerify() {
-  $('mfa-enroll').hidden = true;
-  $('mfa-hint').textContent = `Enter the 6-digit code from your authenticator app for ${pendingMfaEmail || 'your account'}.`;
-  $('mfa-code').value = '';
-  $('mfa-code').focus();
-}
-
-async function beginTotpMfa(result) {
-  pendingMfaToken = result.mfaToken;
-  pendingMfaEmail = result.user?.email || '';
-  sessionStorage.setItem(pendingMfaTokenKey, pendingMfaToken);
-  showMfaForm();
-  if (result.mfaRequired === 'totp-enroll') {
-    const response = await fetch(`${API}/api/auth/totp/enroll`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ mfaToken: pendingMfaToken }),
-    });
-    const body = await response.json();
-    if (!response.ok) throw new Error(body.error || 'Could not start authenticator setup.');
-    showEnrollment(body.otpauthUri, body.secret);
-    return;
-  }
-  showVerify();
-}
-
-/** Submit a 6-digit code: activate on first enrollment, verify thereafter. */
-async function submitTotpCode() {
+async function submitEmailCode() {
   const code = $('mfa-code').value.replace(/\s+/g, '');
   if (!/^\d{6}$/.test(code)) {
-    $('mfa-error').textContent = 'Enter the 6-digit code from your authenticator app.';
+    $('mfa-error').textContent = 'Enter the 6-digit code sent to your email.';
     return;
   }
-  const enrolling = !$('mfa-enroll').hidden;
-  const endpoint = enrolling ? '/api/auth/totp/activate' : '/api/auth/totp/verify';
   const submit = $('mfa-submit');
   submit.disabled = true;
   $('mfa-error').textContent = '';
   try {
-    const response = await fetch(`${API}${endpoint}`, {
+    const response = await fetch(`${API}/api/auth/email/verify`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ mfaToken: pendingMfaToken, code }),
@@ -252,67 +200,12 @@ async function submitTotpCode() {
       $('mfa-error').textContent = result.error || 'That code was not accepted.';
       return;
     }
-    sessionStorage.removeItem(pendingMfaTokenKey);
     pendingMfaToken = null;
-    if (Array.isArray(result.recoveryCodes) && result.recoveryCodes.length) {
-      // Hold the session until the user has acknowledged the recovery codes.
-      pendingSession = result;
-      showRecoveryCodes(result.recoveryCodes);
-      return;
-    }
     await completeLogin(result);
   } catch (error) {
-    $('mfa-error').textContent = totpError(error);
+    $('mfa-error').textContent = emailOtpError(error);
   } finally {
     submit.disabled = false;
-  }
-}
-
-async function copyTotpSetupKey() {
-  const input = $('mfa-manual-key');
-  input.focus();
-  input.select();
-  try {
-    if (navigator.clipboard?.writeText) {
-      try {
-        await navigator.clipboard.writeText(input.value);
-      } catch {
-        if (!document.execCommand('copy')) throw new Error('Clipboard copy failed.');
-      }
-    } else if (!document.execCommand('copy')) {
-      throw new Error('Clipboard copy is unavailable.');
-    }
-    $('mfa-copy-status').textContent = 'Setup key copied.';
-  } catch {
-    $('mfa-copy-status').textContent = 'Copy failed. Select the setup key and copy it manually.';
-  }
-}
-
-/** Recovery codes are shown exactly once, at enrollment, to be written down. */
-function showRecoveryCodes(codes) {
-  $('mfa-enroll').hidden = true;
-  $('mfa-recovery').hidden = false;
-  $('mfa-hint').textContent = 'Save these recovery codes somewhere safe. Each works once if you lose your phone.';
-  $('mfa-recovery-list').innerHTML = codes.map((code) => `<code>${esc(code)}</code>`).join('');
-}
-
-// Render the otpauth URI locally so the shared secret never leaves this page
-// and enrollment works on an offline municipal network (see qrcode.js).
-function makeQrCode(text) {
-  if (window.mzansiQr && typeof window.mzansiQr.render === 'function') {
-    return window.mzansiQr.render(text, 220);
-  }
-  const fallback = document.createElement('div');
-  fallback.className = 'mfa-qr-fallback';
-  fallback.textContent = 'QR rendering unavailable — use the setup key below.';
-  return fallback;
-}
-
-function getMfaTokenFromLink() {
-  try {
-    return new URL(location.href).searchParams.get('mfaToken');
-  } catch {
-    return null;
   }
 }
 
@@ -398,26 +291,13 @@ $('login-form').addEventListener('submit', login);
 
 if ($('mfa-form')) {
   // Submit on the button and on Enter inside the code field.
-  $('mfa-submit').addEventListener('click', submitTotpCode);
-  $('mfa-copy-key').addEventListener('click', copyTotpSetupKey);
+  $('mfa-submit').addEventListener('click', submitEmailCode);
   $('mfa-code').addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') { event.preventDefault(); submitTotpCode(); }
-  });
-  $('mfa-continue').addEventListener('click', async () => {
-    if (!pendingSession) {
-      $('auth-error').textContent = 'Session expired. Sign in again.';
-      return;
-    }
-    const result = pendingSession;
-    pendingSession = null;
-    await completeLogin(result);
+    if (event.key === 'Enter') { event.preventDefault(); submitEmailCode(); }
   });
   $('mfa-back').addEventListener('click', () => {
-    sessionStorage.removeItem(pendingMfaTokenKey);
     pendingMfaToken = null;
     $('mfa-form').hidden = true;
-    $('mfa-enroll').hidden = true;
-    $('mfa-recovery').hidden = true;
     $('login-form').hidden = false;
     $('mfa-error').textContent = '';
   });

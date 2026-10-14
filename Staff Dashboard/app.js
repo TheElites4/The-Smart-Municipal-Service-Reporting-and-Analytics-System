@@ -10,8 +10,27 @@ if ($('mfa-hint')) $('mfa-hint').textContent = 'Enter the one-time code we sent 
 if ($('mfa-code')) $('mfa-code').closest('label').firstChild.textContent = 'Email verification code';
 if ($('mfa-enroll')) $('mfa-enroll').remove();
 if ($('mfa-recovery')) $('mfa-recovery').remove();
+const mfaScreen = document.createElement('section');
+mfaScreen.className = 'auth-screen';
+mfaScreen.id = 'mfa-screen';
+mfaScreen.hidden = true;
+const mfaCard = document.createElement('div');
+mfaCard.className = 'auth-card';
+const mfaBrand = $('auth-screen').querySelector('.brand-mark');
+if (mfaBrand) mfaCard.append(mfaBrand.cloneNode(true));
+const mfaEyebrow = document.createElement('span');
+mfaEyebrow.className = 'eyebrow';
+mfaEyebrow.textContent = 'MZANSICONNECT / EMAIL VERIFICATION';
+const mfaTitle = document.createElement('h1');
+mfaTitle.textContent = 'Check your email';
+const mfaDescription = document.createElement('p');
+mfaDescription.textContent = 'Enter the 6-digit sign-in code sent to your staff account to continue.';
+mfaCard.append(mfaEyebrow, mfaTitle, mfaDescription, $('mfa-form'));
+mfaScreen.append(mfaCard);
+$('auth-screen').after(mfaScreen);
+if ($('mfa-error')) $('mfa-error').setAttribute('role', 'alert');
 const authHeaders = (json = false) => ({ ...(json ? { 'content-type': 'application/json' } : {}), authorization: `Bearer ${localStorage.getItem(tokenKey) || ''}` });
-const logout = () => { localStorage.removeItem(tokenKey); if (liveConnection) liveConnection.close(); $('app-shell').hidden = true; $('auth-screen').hidden = false; loginForm.hidden = false; };
+const logout = () => { localStorage.removeItem(tokenKey); if (liveConnection) liveConnection.close(); $('app-shell').hidden = true; $('mfa-screen').hidden = true; $('auth-screen').hidden = false; loginForm.hidden = false; };
 
 function retainReportPhotoUrls(reportIds) {
   const keep = new Set(reportIds.map(String));
@@ -101,6 +120,8 @@ function beginEmailMfa(result) {
   pendingMfaToken = result.mfaToken;
   pendingMfaEmail = result.user?.email || '';
   loginForm.hidden = true;
+  $('auth-screen').hidden = true;
+  $('mfa-screen').hidden = false;
   $('mfa-form').hidden = false;
   $('mfa-error').textContent = '';
   $('mfa-hint').textContent = `We sent a 6-digit sign-in code to ${pendingMfaEmail || 'your email address'}.`;
@@ -139,6 +160,7 @@ async function submitEmailCode() {
 
 function completeLogin(result) {
   localStorage.setItem(tokenKey, result.token);
+  $('mfa-screen').hidden = true;
   $('auth-screen').hidden = true;
   $('app-shell').hidden = false;
   Promise.resolve(load()).then(connectLive).catch(() => {});
@@ -246,6 +268,8 @@ if ($('mfa-form')) {
   $('mfa-back').addEventListener('click', () => {
     pendingMfaToken = null;
     $('mfa-form').hidden = true;
+    $('mfa-screen').hidden = true;
+    $('auth-screen').hidden = false;
     $('login-form').hidden = false;
     $('mfa-error').textContent = '';
   });

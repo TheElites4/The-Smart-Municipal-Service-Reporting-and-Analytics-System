@@ -225,8 +225,8 @@ divergence that arises when multiple clients hold their own state. Key strengths
 are: (i) validated, structured intake; (ii) a single SLA-authoritative deadline;
 (iii) role-scoped tokens enforced by the API; and (iv) analytics computed only
 from real rows. The principal operational dependency for dashboard access is
-Gmail SMTP delivery: seeded `example.gov.za` addresses are placeholders and
-cannot receive codes, so production access requires Gmail SMTP credentials and
+Gmail API delivery: seeded `example.gov.za` addresses are placeholders and
+cannot receive codes, so production access requires Gmail OAuth credentials and
 reachable staff/admin email accounts. For production the system requires HTTPS,
 a managed secret store, database backups, rate limiting, and an established
 identity provider.

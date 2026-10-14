@@ -34,7 +34,7 @@ psql $env:DATABASE_URL -f backend/seed.sql
    resets the seeded account passwords.
 
 2. Copy `backend/.env.example` to `backend/.env`. Configure a long random
-   `AUTH_SECRET`, the same `DATABASE_URL`, Gmail SMTP using an App Password as
+   `AUTH_SECRET`, the same `DATABASE_URL`, Gmail API OAuth credentials as
    described below, and local browser origins:
 
 ```text
@@ -99,31 +99,40 @@ push notifications are unchanged. Codes expire after five minutes, are
 single-use, and are limited to five verification attempts. A new code can be
 requested once per minute.
 
-For Gmail SMTP, enable **2-Step Verification** on the sending Google account,
-then create an **App Password** from Google Account security settings. Use that
-generated app password, not the account's normal password. Add the following
-settings to `backend/.env` and restart the API:
+Render Free blocks outbound SMTP ports, so dashboard sign-in codes are sent
+through the Gmail API over HTTPS. In Google Cloud, enable the Gmail API, create
+an OAuth consent screen and OAuth client, and authorize the sending account for
+the `https://www.googleapis.com/auth/gmail.send` scope. A Web application
+OAuth client must include `https://developers.google.com/oauthplayground` as an
+authorized redirect URI if you use the official OAuth 2.0 Playground to obtain
+a refresh token. Select the Gmail send scope in the Playground, authorize the
+sending account, exchange the authorization code, and copy the resulting
+refresh token. Keep the client secret and refresh token private.
+
+Set these variables in `backend/.env` and restart the API:
 
 ```text
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=465
-SMTP_SECURE=true
-SMTP_USER=your-account@gmail.com
-SMTP_APP_PASSWORD=your-16-character-app-password
+GMAIL_USER=your-account@gmail.com
+GMAIL_CLIENT_ID=your-oauth-client-id.apps.googleusercontent.com
+GMAIL_CLIENT_SECRET=your-oauth-client-secret
+GMAIL_REFRESH_TOKEN=your-oauth-refresh-token
 ```
 
-`SMTP_FROM` is optional and defaults to `SMTP_USER`. Keep the app password
-private; do not commit it or put it in browser configuration. Personal Gmail
-has sending limits (commonly up to 500 messages per day); Workspace limits and
-provider restrictions differ. The API returns an explicit error and issues no
-dashboard token if SMTP delivery fails.
+The local PowerShell helper `backend/configure-mfa.ps1` prompts for these
+values and hides the client secret and refresh token. If the Google OAuth
+consent screen is in Testing mode, add the sender as a test user; refresh tokens
+for external testing apps can expire after seven days. For a durable deployment,
+publish/configure the OAuth consent screen as required by Google. Personal
+Gmail and Workspace sending quotas still apply. The API returns an explicit
+error and issues no dashboard token if Gmail delivery fails.
 
 Each staff/admin account must have a real, reachable email address. The seeded
 `example.gov.za` addresses are placeholders; replace them in PostgreSQL before
 dashboard login. Existing account addresses can be changed by an administrator
 with the database administrator's normal workflow. On Render, configure
-`SMTP_USER` and `SMTP_APP_PASSWORD` as secret environment variables. Outbound
-SMTP availability may depend on the hosting provider's network policy.
+`GMAIL_USER`, `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, and
+`GMAIL_REFRESH_TOKEN` as environment variables; mark the client secret and
+refresh token as secrets. Remove the obsolete `SMTP_APP_PASSWORD` variable.
 
 ## Database-backed analytics and dropdown options
 

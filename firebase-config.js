@@ -1,5 +1,5 @@
 // Public Firebase Web SDK configuration retained for Firebase-integrated
-// features. Staff/admin dashboard MFA uses Gmail SMTP email codes through the API.
+// features. Staff/admin dashboard MFA uses Gmail API email codes through the API.
 //
 // Get the Web app values from the Firebase Console:
 //   Project settings (gear) -> General -> Your apps -> Web app (</>).

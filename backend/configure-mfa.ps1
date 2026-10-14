@@ -1,25 +1,32 @@
-# Save Gmail SMTP credentials for staff/admin email OTP without displaying the app password.
+# Save Gmail API OAuth credentials for staff/admin email OTP without displaying secrets.
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
 if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 
-$smtpUser = (Read-Host 'Gmail address used to send dashboard sign-in codes').Trim()
-if ($smtpUser -notmatch '^[^@\s]+@[^@\s]+\.[^@\s]+$') { throw 'Enter a valid Gmail or Google Workspace address.' }
+$gmailUser = (Read-Host 'Gmail address used to send dashboard sign-in codes').Trim()
+if ($gmailUser -notmatch '^[^@\s]+@[^@\s]+\.[^@\s]+$') { throw 'Enter a valid Gmail or Google Workspace address.' }
+$clientId = (Read-Host 'Google OAuth client ID').Trim()
+if ($clientId -notmatch '^[^\s]+\.apps\.googleusercontent\.com$') { throw 'Enter a valid Google OAuth client ID.' }
 
-$secure = Read-Host 'Google App Password (hidden; do not use your regular password)' -AsSecureString
-$pointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
-try { $appPassword = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer) }
-finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer) }
-if ([string]::IsNullOrWhiteSpace($appPassword)) { throw 'Google App Password cannot be empty.' }
-$appPassword = $appPassword -replace '\s', ''
+function Read-SecretText($prompt) {
+  $secure = Read-Host $prompt -AsSecureString
+  $pointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+  try { return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer) }
+  finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer) }
+}
 
-$lines = [System.Collections.Generic.List[string]](Get-Content .env)
+$clientSecret = Read-SecretText 'Google OAuth client secret (hidden)'
+$refreshToken = Read-SecretText 'Google OAuth refresh token (hidden)'
+if ([string]::IsNullOrWhiteSpace($clientSecret)) { throw 'Google OAuth client secret cannot be empty.' }
+if ([string]::IsNullOrWhiteSpace($refreshToken)) { throw 'Google OAuth refresh token cannot be empty.' }
+if ($clientSecret -match '[\r\n]' -or $refreshToken -match '[\r\n]') { throw 'OAuth secrets must be entered as single-line values.' }
+
+$lines = [System.Collections.Generic.List[string]](Get-Content .env | Where-Object { $_ -notmatch '^SMTP_(HOST|PORT|SECURE|USER|APP_PASSWORD|FROM)=' })
 foreach ($entry in @(
-  @{ Key = 'SMTP_HOST'; Value = 'smtp.gmail.com' },
-  @{ Key = 'SMTP_PORT'; Value = '465' },
-  @{ Key = 'SMTP_SECURE'; Value = 'true' },
-  @{ Key = 'SMTP_USER'; Value = $smtpUser },
-  @{ Key = 'SMTP_APP_PASSWORD'; Value = $appPassword }
+  @{ Key = 'GMAIL_USER'; Value = $gmailUser },
+  @{ Key = 'GMAIL_CLIENT_ID'; Value = $clientId },
+  @{ Key = 'GMAIL_CLIENT_SECRET'; Value = $clientSecret },
+  @{ Key = 'GMAIL_REFRESH_TOKEN'; Value = $refreshToken }
 )) {
   $index = ($lines | Select-String -Pattern "^$($entry.Key)=" | Select-Object -First 1).LineNumber
   if ($index) { $lines[$index - 1] = "$($entry.Key)=$($entry.Value)" }
@@ -27,5 +34,5 @@ foreach ($entry in @(
 }
 Set-Content .env $lines -Encoding UTF8
 
-Write-Host 'Gmail SMTP settings saved to backend/.env without displaying the app password.'
+Write-Host 'Gmail API OAuth settings saved to backend/.env without displaying secrets.'
 Write-Host 'Run npm.cmd run check:deployment, then restart the backend.'

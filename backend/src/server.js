@@ -2,7 +2,7 @@ import http from 'node:http';
 import { URL } from 'node:url';
 import crypto from 'node:crypto';
 import pg from 'pg';
-import nodemailer from 'nodemailer';
+import { getGmailSettings, sendGmailLoginCode } from './gmail-api.js';
 import { totp } from './totp.js';
 
 const { Pool } = pg;
@@ -89,57 +89,8 @@ const emailOtpMaxAttempts = 5;
 const emailOtpCooldownSeconds = 60;
 const emailOtpHash = (code) => crypto.createHmac('sha256', authSecret).update(code).digest('hex');
 
-const getSmtpSettings = () => {
-  const host = process.env.SMTP_HOST || 'smtp.gmail.com';
-  const port = Number(process.env.SMTP_PORT || 465);
-  const user = process.env.SMTP_USER;
-  const password = process.env.SMTP_APP_PASSWORD;
-  const normalizedPassword = password?.replace(/\s/g, '');
-  const from = process.env.SMTP_FROM || user;
-  if (!user || !normalizedPassword || !from || !Number.isInteger(port) || port < 1 || port > 65535) {
-    throw Object.assign(new Error('Email verification is not configured. Set SMTP_USER and SMTP_APP_PASSWORD in the API environment.'), { statusCode: 503 });
-  }
-  return {
-    host,
-    port,
-    user,
-    password: normalizedPassword,
-    from: from.includes('<') ? from : `MzansiConnect <${from}>`,
-    secure: process.env.SMTP_SECURE ? process.env.SMTP_SECURE.toLowerCase() === 'true' : port === 465,
-  };
-};
-
-const sendLoginCode = async ({ to, fullName, code }, settings) => {
-  const transporter = nodemailer.createTransport({
-    host: settings.host,
-    port: settings.port,
-    secure: settings.secure,
-    auth: { user: settings.user, pass: settings.password },
-    connectionTimeout: 10_000,
-    greetingTimeout: 10_000,
-    socketTimeout: 15_000,
-  });
-  try {
-    await transporter.sendMail({
-      from: settings.from,
-      to,
-      subject: 'Your MzansiConnect sign-in code',
-      text: [
-        `Hello ${fullName || 'there'},`,
-        '',
-        `Your MzansiConnect dashboard verification code is: ${code}`,
-        `It expires in ${emailOtpTtlMinutes} minutes and can only be used once.`,
-        '',
-        'If you did not try to sign in, you can ignore this email.',
-      ].join('\n'),
-    });
-  } finally {
-    transporter.close();
-  }
-};
-
 const createEmailOtpChallenge = async (account) => {
-  const smtpSettings = getSmtpSettings();
+  const gmailSettings = getGmailSettings();
   const code = String(crypto.randomInt(100000, 1000000));
   const challengeId = crypto.randomUUID();
   const client = await pool.connect();
@@ -183,12 +134,13 @@ const createEmailOtpChallenge = async (account) => {
   }
 
   try {
-    await sendLoginCode({ to: account.email, fullName: account.full_name, code }, smtpSettings);
+    await sendGmailLoginCode({ to: account.email, fullName: account.full_name, code }, gmailSettings);
   } catch (error) {
     await query('DELETE FROM auth_mfa_challenges WHERE challenge_id = $1', [challengeId]);
     if (error.statusCode) throw error;
-    console.error(`Dashboard login code email could not be sent (${error.name || 'Error'})`);
-    throw Object.assign(new Error('Unable to send a sign-in code. Check the SMTP settings and try again.'), { statusCode: 503 });
+    const upstreamStatus = error.upstreamStatus ? `, Google HTTP ${error.upstreamStatus}` : '';
+    console.error(`Dashboard login code email could not be sent (${error.name || 'Error'}${upstreamStatus})`);
+    throw Object.assign(new Error('Unable to send a sign-in code. Check the Gmail API settings and try again.'), { statusCode: 503 });
   }
 
   return signToken({

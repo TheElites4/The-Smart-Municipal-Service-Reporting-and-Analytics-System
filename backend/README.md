@@ -6,7 +6,7 @@ The shared system of record for the citizen portal, Android client, staff operat
 
 1. Create a PostgreSQL database and set `DATABASE_URL`.
 2. Apply `schema.sql`, then migrations `002_external_ref.sql`, `003_normalise_municipality.sql`, `004_mfa_challenges.sql`, `005_service_categories.sql`, and `006_municipalities_and_photos.sql`.
-3. Copy `.env.example` to `.env`, configure a unique `AUTH_SECRET`, `SMTP_USER`, `SMTP_APP_PASSWORD`, and ensure each staff/admin account has a reachable email address. Then run `npm.cmd install`, `npm.cmd run check`, and `./start-local.ps1` on Windows.
+3. Copy `.env.example` to `.env`, configure a unique `AUTH_SECRET`, Gmail API OAuth credentials (`GMAIL_USER`, `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, and `GMAIL_REFRESH_TOKEN`), and ensure each staff/admin account has a reachable email address. Then run `npm.cmd install`, `npm.cmd run check`, and `./start-local.ps1` on Windows.
 4. Import the 257 municipality records into the new table: `npm.cmd run import:municipalities`. The importer aborts unless it reads exactly 8 metropolitan, 44 district, and 205 local municipalities; it does not silently publish a partial list.
 
 Run `npm.cmd run test:municipalities` with the local API and database running to
@@ -19,7 +19,7 @@ for the registered-phone management endpoint.
 Run `npm.cmd run test:report-photo` with the local API and database running to
 verify image upload, PostgreSQL persistence, and authorized dashboard retrieval.
 Run `npm.cmd run test:auth-email-mfa` to verify staff and admin email-code login
-using a local SMTP test server and database.
+using a local Gmail API mock and database.
 
 For an empty database, `npm.cmd run setup:database` applies the base schema and
 five migrations in order as a single transaction. It refuses to run if
@@ -62,16 +62,26 @@ Dashboard authentication is enforced by the API. Set `AUTH_SECRET` in production
 
 ### Email OTP MFA for staff/admin dashboards
 
-Configure `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=465`, `SMTP_SECURE=true`,
-`SMTP_USER`, and `SMTP_APP_PASSWORD` in `backend/.env`. The app password is
-created after enabling 2-Step Verification on the Google account; do not use its
-regular password. `SMTP_FROM` is optional and defaults to `SMTP_USER`.
+Enable the Gmail API in Google Cloud and configure an OAuth consent screen and
+OAuth client. Authorize the sending account for
+`https://www.googleapis.com/auth/gmail.send`, then obtain a refresh token using
+the official [OAuth 2.0 Playground](https://developers.google.com/oauthplayground/).
+Set `GMAIL_USER`, `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, and
+`GMAIL_REFRESH_TOKEN` in `backend/.env`. The `configure-mfa.ps1` helper prompts
+for these values and hides the client secret and refresh token. Do not use an
+App Password; the API uses HTTPS and does not connect to SMTP.
+
+The sender receives the narrow Gmail permission scope
+`https://www.googleapis.com/auth/gmail.send`; no inbox-reading scopes are
+requested. If the consent screen is in Testing mode, add the sender as a test
+user. Google may expire refresh tokens for external apps left in Testing mode
+after seven days.
 
 After validating a staff/admin password, `POST /api/auth/login` sends a
 six-digit code to the account email and returns `{ mfaRequired: "email-otp",
 mfaToken }`, never a dashboard token. The short-lived challenge is bound to a
 database record. `POST /api/auth/email/verify` checks and consumes the code
-before issuing the dashboard token. SMTP failures are surfaced explicitly and
+before issuing the dashboard token. Gmail API failures are surfaced explicitly and
 do not permit password-only access. Citizen login is unchanged.
 
 Set `ESKOM_SE_PUSH_TOKEN` from https://developer.sepush.co.za/ in `backend/.env` or in the deployed API's environment to enable live load-shedding lookups. The Render Blueprint declares this as a secret environment variable; enter the token when creating/updating the Render service. The API uses a supplied municipality when available, otherwise reverse-geocodes client coordinates and searches EskomSePush for the matching area. Requests without a location return the provider's national status. The endpoint returns a clear service error when the token is missing/invalid or no area matches; it never invents a stage.

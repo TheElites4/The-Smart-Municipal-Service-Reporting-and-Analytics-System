@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
+import http from 'node:http';
 import net from 'node:net';
 import path from 'node:path';
 import { after, test } from 'node:test';
@@ -27,14 +28,22 @@ await database.connect();
 const testId = randomUUID();
 const staffEmail = `email-mfa-staff-${testId}@local.invalid`;
 const adminEmail = `email-mfa-admin-${testId}@local.invalid`;
+const failedEmail = `email-mfa-failed-${testId}@local.invalid`;
 const password = `email-mfa-test-${randomUUID()}`;
 const accounts = await database.query(
   `INSERT INTO app_users (full_name, email, role, password_hash)
-   VALUES ('Email MFA Staff Test', $1, 'staff', crypt($3, gen_salt('bf'))),
-          ('Email MFA Admin Test', $2, 'admin', crypt($3, gen_salt('bf')))
+   VALUES ('Email MFA Staff Test', $1, 'staff', crypt($4, gen_salt('bf'))),
+          ('Email MFA Admin Test', $2, 'admin', crypt($4, gen_salt('bf'))),
+          ('Email MFA Failure Test', $3, 'staff', crypt($4, gen_salt('bf')))
    RETURNING id, email, role`,
-  [staffEmail, adminEmail, password],
+  [staffEmail, adminEmail, failedEmail, password],
 );
+
+const collectBody = async (request) => {
+  let raw = '';
+  for await (const chunk of request) raw += chunk;
+  return raw;
+};
 
 const findFreePort = async () => {
   const server = net.createServer();
@@ -48,77 +57,66 @@ const findFreePort = async () => {
 };
 
 const emails = [];
-const smtpServer = net.createServer((socket) => {
-  socket.setEncoding('utf8');
-  socket.write('220 localhost test SMTP\r\n');
-  let buffer = '';
-  let dataMode = false;
-  let authMode = '';
-  let message = '';
-  socket.on('data', (chunk) => {
-    buffer += chunk;
-    while (buffer.includes('\r\n')) {
-      const split = buffer.indexOf('\r\n');
-      const line = buffer.slice(0, split);
-      buffer = buffer.slice(split + 2);
-      if (dataMode) {
-        if (line === '.') {
-          dataMode = false;
-          emails.push(message);
-          message = '';
-          socket.write('250 2.0.0 queued\r\n');
-        } else {
-          message += `${line}\n`;
-        }
-      } else if (authMode === 'username') {
-        authMode = 'password';
-        socket.write('334 UGFzc3dvcmQ6\r\n');
-      } else if (authMode === 'password') {
-        authMode = '';
-        socket.write('235 2.7.0 authenticated\r\n');
-      } else if (/^EHLO\b/i.test(line)) {
-        socket.write('250-localhost\r\n250-AUTH LOGIN PLAIN\r\n250 SIZE 10485760\r\n');
-      } else if (/^HELO\b/i.test(line)) {
-        socket.write('250 localhost\r\n');
-      } else if (/^AUTH PLAIN(?:\s|$)/i.test(line)) {
-        socket.write('235 2.7.0 authenticated\r\n');
-      } else if (/^AUTH LOGIN/i.test(line)) {
-        authMode = 'username';
-        socket.write('334 VXNlcm5hbWU6\r\n');
-      } else if (/^(MAIL FROM|RCPT TO)\b/i.test(line)) {
-        socket.write('250 2.1.0 accepted\r\n');
-      } else if (/^DATA$/i.test(line)) {
-        dataMode = true;
-        socket.write('354 end with <CRLF>.<CRLF>\r\n');
-      } else if (/^QUIT$/i.test(line)) {
-        socket.write('221 2.0.0 bye\r\n');
-        socket.end();
-      } else {
-        socket.write('250 2.0.0 ok\r\n');
-      }
+let rejectNextGmailSend = false;
+const gmailApiMock = http.createServer(async (request, response) => {
+  const requestBody = await collectBody(request);
+  if (request.method === 'POST' && request.url === '/token') {
+    const tokenRequest = new URLSearchParams(requestBody);
+    assert.equal(tokenRequest.get('client_id'), 'test-client-id');
+    assert.equal(tokenRequest.get('client_secret'), 'test-client-secret');
+    assert.equal(tokenRequest.get('refresh_token'), 'test-refresh-token');
+    assert.equal(tokenRequest.get('grant_type'), 'refresh_token');
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({
+      access_token: 'test-access-token',
+      expires_in: 3600,
+      scope: 'https://www.googleapis.com/auth/gmail.send',
+    }));
+    return;
+  }
+  if (request.method === 'POST' && request.url === '/gmail/v1/users/me/messages/send') {
+    assert.equal(request.headers.authorization, 'Bearer test-access-token');
+    if (rejectNextGmailSend) {
+      rejectNextGmailSend = false;
+      response.writeHead(403, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({ error: 'test Gmail API failure' }));
+      return;
     }
-  });
+    const { raw } = JSON.parse(requestBody);
+    const message = Buffer.from(raw, 'base64url').toString('utf8');
+    const [, encodedBody = ''] = message.split(/\r?\n\r?\n/);
+    const text = Buffer.from(encodedBody.replace(/\s/g, ''), 'base64').toString('utf8');
+    const recipient = message.match(/^To:\s*(.+)$/mi)?.[1];
+    emails.push({ recipient, message, text });
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({ id: randomUUID(), threadId: randomUUID() }));
+    return;
+  }
+  response.writeHead(404, { 'content-type': 'application/json' });
+  response.end(JSON.stringify({ error: 'not found' }));
 });
 await new Promise((resolve, reject) => {
-  smtpServer.once('error', reject);
-  smtpServer.listen(0, '127.0.0.1', resolve);
+  gmailApiMock.once('error', reject);
+  gmailApiMock.listen(0, '127.0.0.1', resolve);
 });
-const smtpPort = smtpServer.address().port;
+const gmailMockUrl = `http://127.0.0.1:${gmailApiMock.address().port}`;
 const apiPort = await findFreePort();
 const apiUrl = new URL(`http://127.0.0.1:${apiPort}`);
-const apiProcess = spawn(process.execPath, ['src/server.js'], {
+const apiProcess = spawn(process.execPath, [
+  '--import', './test/helpers/mock-gmail-api-fetch.mjs',
+  'src/server.js',
+], {
   cwd: backendDirectory,
   env: {
     ...process.env,
     DATABASE_URL: databaseUrl,
     AUTH_SECRET: authSecret,
     PORT: String(apiPort),
-    SMTP_HOST: '127.0.0.1',
-    SMTP_PORT: String(smtpPort),
-    SMTP_SECURE: 'false',
-    SMTP_USER: 'sender@local.invalid',
-    SMTP_APP_PASSWORD: 'test-only-password',
-    SMTP_FROM: 'MzansiConnect <sender@local.invalid>',
+    GMAIL_USER: 'sender@local.invalid',
+    GMAIL_CLIENT_ID: 'test-client-id',
+    GMAIL_CLIENT_SECRET: 'test-client-secret',
+    GMAIL_REFRESH_TOKEN: 'test-refresh-token',
+    GMAIL_API_MOCK_URL: gmailMockUrl,
   },
   stdio: 'inherit',
 });
@@ -144,7 +142,7 @@ after(async () => {
     apiProcess.once('exit', resolve);
     setTimeout(resolve, 3000);
   });
-  await new Promise((resolve, reject) => smtpServer.close((error) => error ? reject(error) : resolve()));
+  await new Promise((resolve, reject) => gmailApiMock.close((error) => error ? reject(error) : resolve()));
   await database.query('DELETE FROM app_users WHERE id = ANY($1::uuid[])', [accounts.rows.map((account) => account.id)]);
   await database.end();
 });
@@ -167,9 +165,10 @@ const requestLoginCode = async (email) => {
   const challenge = JSON.parse(Buffer.from(result.mfaToken.split('.')[0], 'base64url').toString());
   assert.equal(challenge.purpose, 'email-otp-mfa');
   assert.ok(challenge.challengeId);
-  const emailMessage = emails.findLast((message) => message.toLowerCase().includes(email.toLowerCase()));
-  assert.ok(emailMessage, 'the API should deliver a login code to the account email');
-  const code = emailMessage.match(/verification code is:\s*(\d{6})/i)?.[1];
+  const emailMessage = emails.findLast((message) => message.recipient?.toLowerCase() === email.toLowerCase());
+  assert.ok(emailMessage, 'the Gmail API should deliver a login code to the account email');
+  assert.match(emailMessage.message, /^Subject: Your MzansiConnect sign-in code$/mi);
+  const code = emailMessage.text.match(/verification code is:\s*(\d{6})/i)?.[1];
   assert.ok(code, 'the email should contain a 6-digit login code');
   return { mfaToken: result.mfaToken, code };
 };
@@ -202,4 +201,22 @@ test('admin email OTP is also required before issuing a dashboard session', asyn
   assert.equal(verified.status, 200, result.error || `Unexpected HTTP ${verified.status}`);
   assert.equal(result.user.role, 'admin');
   assert.equal(typeof result.token, 'string');
+});
+
+test('Gmail API delivery failures do not create a usable email OTP challenge', async () => {
+  rejectNextGmailSend = true;
+  const response = await post('/api/auth/login', { email: failedEmail, password });
+  const result = await response.json();
+
+  assert.equal(response.status, 503);
+  assert.match(result.error, /Gmail message send failed with HTTP 403/);
+  assert.equal(result.mfaRequired, undefined);
+  assert.equal(result.token, undefined);
+  const failedAccount = accounts.rows.find((account) => account.email === failedEmail);
+  const challenges = await database.query(
+    `SELECT challenge_id FROM auth_mfa_challenges
+      WHERE user_id = $1 AND delivery_method = 'email'`,
+    [failedAccount.id],
+  );
+  assert.equal(challenges.rowCount, 0);
 });

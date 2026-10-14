@@ -16,7 +16,6 @@
     "import:municipalities": "node scripts/import-municipalities.mjs"
   },
   "dependencies": {
-    "nodemailer": "^10.1.0",
     "pg": "^8.13.1"
   }
 }

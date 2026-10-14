@@ -351,7 +351,7 @@ async function dashboardData(municipality) {
   const values = municipality ? [municipality] : [];
   const [summary, queue, staff] = await Promise.all([
     query(`SELECT count(*)::int AS total, count(*) FILTER (WHERE status IN ('submitted','under_review'))::int AS unassigned, count(*) FILTER (WHERE status = 'in_progress')::int AS in_progress, count(*) FILTER (WHERE status IN ('resolved','closed'))::int AS resolved FROM service_reports r ${filter}`, values),
-    query(`SELECT r.id, r.public_reference, r.category, r.description, r.location_text, r.urgency, r.status, r.created_at, r.sla_due_at, u.full_name AS citizen_name, a.staff_id, su.full_name AS staff_name FROM service_reports r JOIN app_users u ON u.id = r.citizen_id LEFT JOIN report_assignments a ON a.report_id = r.id LEFT JOIN app_users su ON su.id = a.staff_id ${filter} ORDER BY CASE r.urgency WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END, r.created_at DESC LIMIT 100`, values),
+    query(`SELECT r.id, r.public_reference, r.category, r.description, r.location_text, r.urgency, r.status, r.created_at, r.sla_due_at, EXISTS (SELECT 1 FROM report_photos p WHERE p.report_id = r.id) AS has_photo, u.full_name AS citizen_name, a.staff_id, su.full_name AS staff_name FROM service_reports r JOIN app_users u ON u.id = r.citizen_id LEFT JOIN report_assignments a ON a.report_id = r.id LEFT JOIN app_users su ON su.id = a.staff_id ${filter} ORDER BY CASE r.urgency WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END, r.created_at DESC LIMIT 100`, values),
     query(`SELECT u.id, u.full_name, u.department, u.municipality, u.is_active, u.last_seen_at, count(a.report_id)::int AS open_jobs FROM app_users u LEFT JOIN report_assignments a ON a.staff_id = u.id LEFT JOIN service_reports r ON r.id = a.report_id AND r.status NOT IN ('resolved','closed') WHERE u.role = 'staff' ${municipality ? 'AND normalise_municipality(u.municipality) = normalise_municipality($1)' : ''} GROUP BY u.id ORDER BY open_jobs DESC`, values)
   ]);
   return { summary: summary.rows[0], reports: queue.rows, staff: staff.rows };
@@ -817,7 +817,7 @@ const server = http.createServer(async (req, res) => {
         await client.query('ROLLBACK');
         throw error;
       } finally { client.release(); }
-      broadcast('report.created', saved);
+      broadcast('report.created', { ...saved, has_photo: !!photoBytes });
       return json(res, 201, { ...saved, has_photo: !!photoBytes }, req);
     }
 
@@ -841,7 +841,7 @@ const server = http.createServer(async (req, res) => {
       const input = await body(req);
       if (!validStatuses.has(input.status)) return json(res, 400, { error: 'Invalid report status' }, req);
       const previous = await query('SELECT status FROM service_reports WHERE id = $1', [status[1]]);
-      const result = await query("UPDATE service_reports SET status = $2, resolved_at = CASE WHEN $2 IN ('resolved','closed') THEN now() ELSE NULL END WHERE id = $1 AND ($3 = 'admin' OR normalise_municipality(municipality) = normalise_municipality($4)) RETURNING *", [status[1], input.status, user.role, user.municipality || '']);
+      const result = await query("UPDATE service_reports SET status = $2::report_status, resolved_at = CASE WHEN $2::report_status IN ('resolved','closed') THEN now() ELSE NULL END WHERE id = $1 AND ($3 = 'admin' OR normalise_municipality(municipality) = normalise_municipality($4)) RETURNING *", [status[1], input.status, user.role, user.municipality || '']);
       if (!result.rows[0]) return json(res, 404, { error: 'Report not found' }, req);
       await query('INSERT INTO report_status_events (report_id, from_status, to_status, changed_by, note) VALUES ($1, $2, $3, $4, $5)', [status[1], previous.rows[0]?.status || null, input.status, user.sub, input.note || null]);
       broadcast('report.updated', result.rows[0]);
@@ -850,7 +850,7 @@ const server = http.createServer(async (req, res) => {
 
     return json(res, 404, { error: 'Not found' }, req);
   } catch (error) {
-    console.error(error);
+    if (!error.statusCode || error.statusCode >= 500) console.error(error);
     return json(res, error.statusCode || 500, { error: error.statusCode ? error.message : 'Request failed' }, req);
   }
 });

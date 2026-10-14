@@ -112,35 +112,18 @@ SMTP_USER=your-account@gmail.com
 SMTP_APP_PASSWORD=your-16-character-app-password
 ```
 
-Use the new email as the admin login. Update the seeded staff account too, or
-remove it and create a replacement with a real email address. Then use the admin
-dashboard to create staff accounts. The server issues no dashboard token until
-Firebase verifies the account email and the password challenge is valid. Existing
-databases must apply
-`005_service_categories.sql` and `006_municipalities_and_photos.sql`, then run
-`npm.cmd run import:municipalities`, before using the report forms. The importer
-aborts instead of importing an incomplete municipality directory.
-An admin can update an existing staff member's contact phone number in the
-**Update a staff phone number** panel without changing the account password.
+`SMTP_FROM` is optional and defaults to `SMTP_USER`. Keep the app password
+private; do not commit it or put it in browser configuration. Personal Gmail
+has sending limits (commonly up to 500 messages per day); Workspace limits and
+provider restrictions differ. The API returns an explicit error and issues no
+dashboard token if SMTP delivery fails.
 
-Enable Firebase email-link authentication in project `mzansireport-e01b4`:
-
-1. Add a **Web app**, then enable **Authentication -> Sign-in method ->
-   Email/Password** and its **Email link (passwordless sign-in)** option.
-2. Make sure the Web app config in the repository-root `firebase-config.js`
-   contains that Web app's `appId`. The `google-services.json` file is for the
-   Android app and is not used by the dashboards.
-3. Add the dashboard hosts under **Authentication -> Settings -> Authorized
-   domains**. `localhost` is already authorized in this project; hosted
-   deployments still need their exact domains added.
-The dashboards send an email link after the password step; the API validates the
-Firebase ID token against Google's public certificates and requires its verified
-email to match the active account before issuing a dashboard token. The link is
-valid only with the signed password challenge, which expires after ten minutes.
-Add each dashboard website's domain to Firebase Authentication's authorized
-domains and to the API's `ALLOWED_ORIGINS`. The
-Render Blueprint includes GitHub Pages and the default Firebase Hosting domains;
-update `ALLOWED_ORIGINS` if you use a custom domain.
+Each staff/admin account must have a real, reachable email address. The seeded
+`example.gov.za` addresses are placeholders; replace them in PostgreSQL before
+dashboard login. Existing account addresses can be changed by an administrator
+with the database administrator's normal workflow. On Render, configure
+`SMTP_USER` and `SMTP_APP_PASSWORD` as secret environment variables. Outbound
+SMTP availability may depend on the hosting provider's network policy.
 
 ## Database-backed analytics and dropdown options
 

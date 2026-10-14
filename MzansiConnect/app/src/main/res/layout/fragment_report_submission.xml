@@ -256,6 +256,14 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textColor="@color/web_text_muted" />
+            <ImageView
+                android:id="@+id/photo_preview"
+                android:layout_width="match_parent"
+                android:layout_height="180dp"
+                android:layout_marginTop="8dp"
+                android:contentDescription="Selected report photo preview"
+                android:scaleType="centerCrop"
+                android:visibility="gone" />
 
             <!-- Urgency -->
             <TextView

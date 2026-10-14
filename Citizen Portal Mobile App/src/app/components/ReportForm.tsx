@@ -10,6 +10,8 @@ import { FileText, MapPin, Locate, CheckCircle2, XCircle, Check } from 'lucide-r
 import { categoryVisual } from '../utils/categoryIcons';
 
 const api = import.meta.env.VITE_API_URL || 'http://localhost:8787';
+const maxPhotoBytes = 2_500_000;
+const maxPhotoDimension = 1600;
 
 interface ReportFormProps {
   onSubmit: (report: any) => Promise<void>;
@@ -102,17 +104,45 @@ const [errors, setErrors] = useState<Record<string, string>>({});
     setPhoto(null);
     setPhotoName('');
     if (!file) return;
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 3_000_000) {
-      setErrors((previous) => ({ ...previous, photo: 'Choose a JPEG, PNG or WebP photo under 3 MB.' }));
+    if (!file.type.startsWith('image/')) {
+      setErrors((previous) => ({ ...previous, photo: 'Choose a supported image file.' }));
       return;
+    }
+    const bitmap = await createImageBitmap(file);
+    const initialScale = Math.min(1, maxPhotoDimension / bitmap.width, maxPhotoDimension / bitmap.height);
+    let width = Math.max(1, Math.round(bitmap.width * initialScale));
+    let height = Math.max(1, Math.round(bitmap.height * initialScale));
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    if (!context) {
+      bitmap.close();
+      throw new Error('Photo processing is unavailable in this browser.');
+    }
+
+    let compressed: Blob | null = null;
+    while (Math.max(width, height) >= 640) {
+      canvas.width = width;
+      canvas.height = height;
+      context.drawImage(bitmap, 0, 0, width, height);
+      for (const quality of [0.86, 0.76, 0.66, 0.56]) {
+        compressed = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
+        if (compressed && compressed.size <= maxPhotoBytes) break;
+      }
+      if (compressed && compressed.size <= maxPhotoBytes) break;
+      width = Math.round(width * 0.8);
+      height = Math.round(height * 0.8);
+    }
+    bitmap.close();
+    if (!compressed || compressed.size > maxPhotoBytes) {
+      throw new Error('Unable to reduce this photo to the 2.5 MB upload limit.');
     }
     const dataUrl = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(String(reader.result));
       reader.onerror = () => reject(new Error('Unable to read photo'));
-      reader.readAsDataURL(file);
+      reader.readAsDataURL(compressed);
     });
-    setPhoto({ contentType: file.type, base64: dataUrl.split(',')[1] });
+    setPhoto({ contentType: 'image/jpeg', base64: dataUrl.split(',')[1] });
     setPhotoName(file.name);
     setErrors((previous) => ({ ...previous, photo: '' }));
   };
@@ -268,8 +298,8 @@ const [errors, setErrors] = useState<Record<string, string>>({});
 
               <div>
                 <Label htmlFor="report-photo">Add a photo (optional)</Label>
-                <Input id="report-photo" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={(event) => choosePhoto(event.target.files?.[0]).catch(() => setErrors((previous) => ({ ...previous, photo: 'Unable to read photo.' })))} className="mt-2" />
-                <p className="mt-1 text-sm text-muted-foreground">{photoName || 'JPEG, PNG or WebP · max 3 MB · stored with your report'}</p>
+                <Input id="report-photo" type="file" accept="image/*" capture="environment" onChange={(event) => choosePhoto(event.target.files?.[0]).catch((error: unknown) => setErrors((previous) => ({ ...previous, photo: error instanceof Error ? error.message : 'Unable to process photo.' })))} className="mt-2" />
+                <p className="mt-1 text-sm text-muted-foreground">{photoName || 'Photo is resized and stored with your report · max 2.5 MB after processing'}</p>
                 {photo && <img src={`data:${photo.contentType};base64,${photo.base64}`} alt="Selected report preview" className="mt-3 max-h-48 w-full rounded-lg object-cover" />}
                 {photo && <Button type="button" variant="outline" onClick={() => { setPhoto(null); setPhotoName(''); }} className="mt-2">Remove photo</Button>}
                 {errors.photo && <p className="text-sm text-destructive">{errors.photo}</p>}

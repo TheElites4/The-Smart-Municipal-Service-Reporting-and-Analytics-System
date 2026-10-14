@@ -4,13 +4,53 @@ const tokenKey = 'mzansiStaffToken';
 let liveConnection;
 let latestReports = [];
 let pollTimer; // fallback refresh so new citizen reports appear even if the live stream drops
+const reportPhotoUrls = new Map();
 const loginForm = $('login-form');
-const authHeaders = (json = false) => ({ ...(json ? { 'content-type': 'application/json' } : {}), authorization: `Bearer ${localStorage.getItem(tokenKey) || ''}` });
 if ($('mfa-hint')) $('mfa-hint').textContent = 'Enter the one-time code we sent to your email.';
 if ($('mfa-code')) $('mfa-code').closest('label').firstChild.textContent = 'Email verification code';
 if ($('mfa-enroll')) $('mfa-enroll').remove();
 if ($('mfa-recovery')) $('mfa-recovery').remove();
+const authHeaders = (json = false) => ({ ...(json ? { 'content-type': 'application/json' } : {}), authorization: `Bearer ${localStorage.getItem(tokenKey) || ''}` });
 const logout = () => { localStorage.removeItem(tokenKey); if (liveConnection) liveConnection.close(); $('app-shell').hidden = true; $('auth-screen').hidden = false; loginForm.hidden = false; };
+
+function retainReportPhotoUrls(reportIds) {
+  const keep = new Set(reportIds.map(String));
+  for (const [id, url] of reportPhotoUrls) {
+    if (!keep.has(id)) {
+      URL.revokeObjectURL(url);
+      reportPhotoUrls.delete(id);
+    }
+  }
+}
+
+async function loadReportPhoto(image, status, reportId) {
+  const id = String(reportId);
+  const cached = reportPhotoUrls.get(id);
+  if (cached) {
+    image.src = cached;
+    image.hidden = false;
+    status.hidden = true;
+    return;
+  }
+  try {
+    const response = await fetch(`${API}/api/reports/${encodeURIComponent(id)}/photo`, { headers: authHeaders() });
+    if (response.status === 401) {
+      logout();
+      return;
+    }
+    if (!response.ok) throw new Error(`Photo unavailable (HTTP ${response.status}).`);
+    const blob = await response.blob();
+    if (!blob.type.startsWith('image/')) throw new Error('The API returned an invalid photo.');
+    if (!image.isConnected) return;
+    const objectUrl = URL.createObjectURL(blob);
+    reportPhotoUrls.set(id, objectUrl);
+    image.src = objectUrl;
+    image.hidden = false;
+    status.hidden = true;
+  } catch (error) {
+    if (image.isConnected) status.textContent = error instanceof Error ? error.message : 'Photo unavailable.';
+  }
+}
 
 // Icons + toast helper (no external dependencies).
 const icons = {
@@ -112,6 +152,7 @@ function renderQueue() {
   const term = $('queue-search').value.trim().toLowerCase();
   const jobs = latestReports.filter((report) => !['resolved', 'closed'].includes(report.status));
   const filtered = term ? jobs.filter((report) => [report.public_reference, report.category, report.description, report.location_text, report.citizen_name].join(' ').toLowerCase().includes(term)) : jobs;
+  retainReportPhotoUrls(filtered.filter((report) => report.has_photo).map((report) => report.id));
   $('queue').innerHTML = '';
   if (!filtered.length) {
     $('queue').innerHTML = `<div class="empty">${icons.inbox}<div>${term ? 'No open jobs match your search.' : 'No open jobs in this queue.'}</div></div>`;
@@ -122,6 +163,13 @@ function renderQueue() {
     job.classList.add(`urgency-${String(report.urgency || 'medium').toLowerCase()}`);
     job.querySelector('.reference').textContent = report.public_reference; job.querySelector('.category').textContent = report.category;
     job.querySelector('.description').textContent = report.description;
+    if (report.has_photo) {
+      const figure = document.createElement('figure');
+      figure.className = 'report-photo';
+      figure.innerHTML = '<img alt="Evidence photo submitted with this report" hidden><figcaption>Loading evidence photo…</figcaption>';
+      job.querySelector('.description').after(figure);
+      loadReportPhoto(figure.querySelector('img'), figure.querySelector('figcaption'), report.id);
+    }
     job.querySelector('.location').textContent = `📍 ${report.location_text}`;
     job.querySelector('.citizen').textContent = `Citizen: ${report.citizen_name || 'Unknown'}`;
     job.querySelector('.status-chip').textContent = statusLabel(report.status);

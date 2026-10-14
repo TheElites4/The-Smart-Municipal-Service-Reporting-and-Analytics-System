@@ -193,6 +193,10 @@ public class DataRepository {
                     return;
                 }
                 Map<String, Object> saved = response.body();
+                if (photo != null && !Boolean.TRUE.equals(saved.get("has_photo"))) {
+                    callback.onFailure("The report was saved without its photo. Please retry with the photo selected.");
+                    return;
+                }
                 report.remoteId = String.valueOf(saved.get("id"));
                 report.publicReference = String.valueOf(saved.get("public_reference"));
                 report.status = String.valueOf(saved.get("status"));

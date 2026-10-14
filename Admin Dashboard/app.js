@@ -6,6 +6,7 @@ if ($('mfa-code')) $('mfa-code').closest('label').firstChild.textContent = 'Emai
 if ($('mfa-enroll')) $('mfa-enroll').remove();
 if ($('mfa-recovery')) $('mfa-recovery').remove();
 let liveConnection;
+const reportPhotoUrls = new Map();
 const authHeaders = (json = false) => ({ ...(json ? { 'content-type': 'application/json' } : {}), authorization: `Bearer ${localStorage.getItem(TOKEN_KEY) || ''}` });
 const analyticsPanel = document.createElement('section');
 analyticsPanel.className = 'panel analytics-panel';
@@ -13,6 +14,45 @@ analyticsPanel.innerHTML = '<div class="panel-title"><div><h2>Operational analyt
 $('overview').after(analyticsPanel);
 const loginForm = $('login-form');
 const showLogin = () => { localStorage.removeItem(TOKEN_KEY); if (liveConnection) liveConnection.close(); $('app-shell').hidden = true; $('auth-screen').hidden = false; loginForm.hidden = false; };
+function retainReportPhotoUrls(reportIds) {
+  const keep = new Set(reportIds.map(String));
+  for (const [id, url] of reportPhotoUrls) {
+    if (!keep.has(id)) {
+      URL.revokeObjectURL(url);
+      reportPhotoUrls.delete(id);
+    }
+  }
+}
+
+async function loadReportPhoto(image, status, reportId) {
+  const id = String(reportId);
+  const cached = reportPhotoUrls.get(id);
+  if (cached) {
+    image.src = cached;
+    image.hidden = false;
+    status.hidden = true;
+    return;
+  }
+  try {
+    const response = await fetch(`${API}/api/reports/${encodeURIComponent(id)}/photo`, { headers: authHeaders() });
+    if (response.status === 401) {
+      showLogin();
+      return;
+    }
+    if (!response.ok) throw new Error(`Photo unavailable (HTTP ${response.status}).`);
+    const blob = await response.blob();
+    if (!blob.type.startsWith('image/')) throw new Error('The API returned an invalid photo.');
+    if (!image.isConnected) return;
+    const objectUrl = URL.createObjectURL(blob);
+    reportPhotoUrls.set(id, objectUrl);
+    image.src = objectUrl;
+    image.hidden = false;
+    status.hidden = true;
+  } catch (error) {
+    if (image.isConnected) status.textContent = error instanceof Error ? error.message : 'Photo unavailable.';
+  }
+}
+
 const staffForm = document.createElement('form');
 staffForm.className = 'panel staff-form';
 staffForm.innerHTML = '<h2>Add staff member</h2><p>Create an operations login saved securely in PostgreSQL. Staff can then sign in to the Staff Operations dashboard.</p><input name="fullName" placeholder="Full name" required><input name="email" type="email" placeholder="Email" required><input name="phone" type="tel" placeholder="Phone in international format, e.g. +27821234567" pattern="[+][1-9][0-9]{7,14}" title="Enter a phone number in international E.164 format." required><input name="password" type="password" minlength="12" placeholder="Temporary password (12+ characters)" required><select name="municipality" required><option value="">Loading municipalities…</option></select><input name="department" placeholder="Department (optional)"><button type="submit">Create staff account</button><span class="staff-form-message"></span>';
@@ -252,7 +292,13 @@ async function load() {
     ['resolved', 'Resolved / closed', 'check', 'tone-resolved'],
   ].map(([key, label, icon, tone]) => `<div class="stat ${tone}"><span class="stat-icon">${icons[icon]}</span><strong>${data.summary[key] || 0}</strong><span>${label}</span></div>`).join('');
   $('staff').innerHTML = data.staff.length ? data.staff.map((person) => { const loadValue = Math.min(100, (person.open_jobs || 0) * 12); const hot = (person.open_jobs || 0) >= 5; return `<div class="person"><span class="avatar">${esc(initials(person.full_name))}</span><div class="person-body"><div class="person-top"><div><h3>${esc(person.full_name)}</h3><small>${esc(person.department || 'Municipal services')} · ${esc(person.municipality || 'Unassigned')}</small></div><span class="badge ${person.is_active ? '' : 'off'}">${person.is_active ? 'Active' : 'Inactive'}</span></div><small>${person.open_jobs || 0} open assignments · last seen ${person.last_seen_at ? new Date(person.last_seen_at).toLocaleString() : 'never'}</small><div class="bar ${hot ? 'hot' : ''}"><b style="width:${loadValue}%"></b></div></div></div>`; }).join('') : `<div class="empty-state">${icons.inbox}<div>No staff records found.</div></div>`;
-  $('reports').innerHTML = data.reports.slice(0, 8).map((report) => `<div class="report"><div class="report-top"><div><span class="report-ref"><span class="dot"></span><span class="reference">${esc(report.public_reference)}</span></span><h3>${esc(report.category)}</h3></div><span class="priority ${esc(String(report.urgency).toLowerCase())}">${esc(report.urgency)}</span></div><p>${esc(report.description)}</p><div class="report-meta"><span class="chip">${esc(report.location_text)}</span><span class="chip">${esc(report.status.replaceAll('_', ' '))}</span></div></div>`).join('') || `<div class="empty-state">${icons.inbox}<div>No reports found.</div></div>`;
+  const recentReports = data.reports.slice(0, 8);
+  retainReportPhotoUrls(recentReports.filter((report) => report.has_photo).map((report) => report.id));
+  $('reports').innerHTML = recentReports.map((report) => `<div class="report"><div class="report-top"><div><span class="report-ref"><span class="dot"></span><span class="reference">${esc(report.public_reference)}</span></span><h3>${esc(report.category)}</h3></div><span class="priority ${esc(String(report.urgency).toLowerCase())}">${esc(report.urgency)}</span></div><p>${esc(report.description)}</p>${report.has_photo ? `<figure class="report-photo"><img alt="Evidence photo for ${esc(report.public_reference)}" hidden><figcaption>Loading evidence photo…</figcaption></figure>` : ''}<div class="report-meta"><span class="chip">${esc(report.location_text)}</span><span class="chip">${esc(report.status.replaceAll('_', ' '))}</span></div></div>`).join('') || `<div class="empty-state">${icons.inbox}<div>No reports found.</div></div>`;
+  recentReports.filter((report) => report.has_photo).forEach((report) => {
+    const card = Array.from($('reports').children).find((element) => element.querySelector('.reference')?.textContent === report.public_reference);
+    if (card) loadReportPhoto(card.querySelector('.report-photo img'), card.querySelector('.report-photo figcaption'), report.id);
+  });
 }
 
 // Live load-shedding provider, mirroring the Android dashboard banner

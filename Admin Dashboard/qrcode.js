@@ -205,7 +205,8 @@
     const positions = ALIGNMENT[version];
     for (const row of positions) {
       for (const col of positions) {
-        if (reserved[row][col]) continue;
+        if ((row === 6 && (col === 6 || col === size - 7)) ||
+            (col === 6 && row === size - 7)) continue;
         for (let r = -2; r <= 2; r += 1) {
           for (let c = -2; c <= 2; c += 1) {
             const isBorder = Math.abs(r) === 2 || Math.abs(c) === 2;
@@ -375,12 +376,12 @@
     const { modules, size } = buildMatrix(text);
     const quiet = 4;
     const total = size + quiet * 2;
-    const scale = Math.max(2, Math.floor(pixelSize / total));
+    const scale = Math.max(4, Math.floor(pixelSize / total));
     const canvas = document.createElement('canvas');
     canvas.width = total * scale;
     canvas.height = total * scale;
-    canvas.style.width = `${pixelSize}px`;
-    canvas.style.height = `${pixelSize}px`;
+    canvas.style.width = `${canvas.width}px`;
+    canvas.style.height = `${canvas.height}px`;
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);

@@ -104,6 +104,9 @@ export default function App() {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'The service could not save this report.');
+      if (report.photo && result.has_photo !== true) {
+        throw new Error('The report was saved without its photo. Please retry with the photo selected.');
+      }
       const remoteReport = toCitizenReport(result);
       report = { ...remoteReport, id: remoteReport.public_reference || remoteReport.id, date: remoteReport.created_at || remoteReport.date };
     } catch (error) {

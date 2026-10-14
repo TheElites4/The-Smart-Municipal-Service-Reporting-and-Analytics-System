@@ -2,6 +2,8 @@ package com.example.mzansiconnect.ui.report;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
@@ -64,6 +66,7 @@ public class ReportSubmissionFragment extends Fragment {
     private final androidx.activity.result.ActivityResultLauncher<String> photoPicker = registerForActivityResult(new ActivityResultContracts.GetContent(), this::readPhoto);
     private TextView municipalityDetected, suggestionStatus, descriptionError, locationError,
             categoryError, descriptionCount;
+    private ImageView photoPreview;
 
     private Button urgencyLow, urgencyMedium, urgencyHigh;
     private String selectedCategory = null;
@@ -78,6 +81,7 @@ public class ReportSubmissionFragment extends Fragment {
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity());
         locationEdit = root.findViewById(R.id.edit_location);
         descEdit = root.findViewById(R.id.edit_desc);
+        photoPreview = root.findViewById(R.id.photo_preview);
         categoryGrid = root.findViewById(R.id.category_grid);
         municipalityEdit = root.findViewById(R.id.edit_municipality);
         issueEdit = root.findViewById(R.id.edit_issue_type);
@@ -369,25 +373,76 @@ public class ReportSubmissionFragment extends Fragment {
 
     private void readPhoto(Uri uri) {
         selectedPhoto = null;
-        if (uri == null || !isAdded()) return;
-        try (InputStream input = requireContext().getContentResolver().openInputStream(uri);
-             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-            if (input == null) throw new IllegalArgumentException("Cannot read photo");
-            byte[] chunk = new byte[8192];
-            int count;
-            while ((count = input.read(chunk)) != -1) {
-                output.write(chunk, 0, count);
-                if (output.size() > 3_000_000) throw new IllegalArgumentException("Photo exceeds 3 MB");
+        if (!isAdded()) return;
+        photoPreview.setImageDrawable(null);
+        photoPreview.setVisibility(View.GONE);
+        ((TextView) requireView().findViewById(R.id.photo_status)).setText("");
+        if (uri == null) return;
+        try {
+            BitmapFactory.Options bounds = new BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            try (InputStream input = requireContext().getContentResolver().openInputStream(uri)) {
+                if (input == null) throw new IllegalArgumentException("Cannot read photo");
+                BitmapFactory.decodeStream(input, null, bounds);
             }
-            byte[] bytes = output.toByteArray();
-            String type = requireContext().getContentResolver().getType(uri);
-            if (bytes.length == 0 || !("image/jpeg".equals(type) && bytes.length > 3 && (bytes[0] & 255) == 255 && (bytes[1] & 255) == 216 || "image/png".equals(type) && bytes.length > 8 && (bytes[0] & 255) == 137 || "image/webp".equals(type) && bytes.length > 12 && new String(bytes, 0, 4).equals("RIFF"))) throw new IllegalArgumentException("Choose a JPEG, PNG or WebP photo");
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw new IllegalArgumentException("Choose a readable image");
+            int sampleSize = 1;
+            while (Math.max(bounds.outWidth / sampleSize, bounds.outHeight / sampleSize) > 2400) sampleSize *= 2;
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inSampleSize = sampleSize;
+            Bitmap bitmap;
+            try (InputStream input = requireContext().getContentResolver().openInputStream(uri)) {
+                if (input == null) throw new IllegalArgumentException("Cannot read photo");
+                bitmap = BitmapFactory.decodeStream(input, null, options);
+            }
+            if (bitmap == null) throw new IllegalArgumentException("Choose a readable image");
+            int maxDimension = Math.max(bitmap.getWidth(), bitmap.getHeight());
+            if (maxDimension > 1600) {
+                float scale = 1600f / maxDimension;
+                Bitmap resized = Bitmap.createScaledBitmap(bitmap,
+                    Math.max(1, Math.round(bitmap.getWidth() * scale)),
+                    Math.max(1, Math.round(bitmap.getHeight() * scale)), true);
+                if (resized != bitmap) bitmap.recycle();
+                bitmap = resized;
+            }
+            byte[] bytes = compressPhoto(bitmap);
+            if (bytes.length == 0 || bytes.length > 2_500_000) throw new IllegalArgumentException("Photo could not be reduced below 2.5 MB");
             selectedPhoto = new HashMap<>();
-            selectedPhoto.put("contentType", type);
+            selectedPhoto.put("contentType", "image/jpeg");
             selectedPhoto.put("base64", Base64.encodeToString(bytes, Base64.NO_WRAP));
+            photoPreview.setImageBitmap(bitmap);
+            photoPreview.setVisibility(View.VISIBLE);
             ((TextView) requireView().findViewById(R.id.photo_status)).setText("Photo ready to submit with report");
         } catch (Exception error) {
+            photoPreview.setImageDrawable(null);
+            photoPreview.setVisibility(View.GONE);
             ((TextView) requireView().findViewById(R.id.photo_status)).setText(error.getMessage());
+        }
+    }
+
+    private byte[] compressPhoto(Bitmap bitmap) {
+        Bitmap current = bitmap;
+        while (true) {
+            for (int quality = 85; quality >= 55; quality -= 10) {
+                ByteArrayOutputStream output = new ByteArrayOutputStream();
+                current.compress(Bitmap.CompressFormat.JPEG, quality, output);
+                if (output.size() <= 2_500_000) {
+                    if (current != bitmap) current.recycle();
+                    return output.toByteArray();
+                }
+            }
+            int width = current.getWidth();
+            int height = current.getHeight();
+            if (Math.max(width, height) <= 640) {
+                if (current != bitmap) current.recycle();
+                bitmap.recycle();
+                return new byte[0];
+            }
+            Bitmap smaller = Bitmap.createScaledBitmap(current,
+                Math.max(1, Math.round(width * 0.75f)),
+                Math.max(1, Math.round(height * 0.75f)), true);
+            if (current != bitmap) current.recycle();
+            current = smaller;
         }
     }
 

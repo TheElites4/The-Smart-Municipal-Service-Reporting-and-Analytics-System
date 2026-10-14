@@ -16,6 +16,10 @@ to run against non-local API or database hosts.
 Run `npm.cmd run test:staff-phone` with the local API and database running to
 verify admin authorization, E.164 validation, staff-only updates, and cleanup
 for the registered-phone management endpoint.
+Run `npm.cmd run test:report-photo` with the local API and database running to
+verify image upload, PostgreSQL persistence, and authorized dashboard retrieval.
+Run `npm.cmd run test:auth-email-mfa` to verify staff and admin email-code login
+using a local SMTP test server and database.
 
 For an empty database, `npm.cmd run setup:database` applies the base schema and
 five migrations in order as a single transaction. It refuses to run if
@@ -23,7 +27,7 @@ five migrations in order as a single transaction. It refuses to run if
 existing database. The [Render setup instructions](../Citizen%20Portal%20Mobile%20App/README.md#publish-on-github-pages)
 cover securely initializing a new hosted database and importing municipalities.
 
-Report photos are optional JPEG, PNG, or WebP uploads up to 3 MB. They are stored in PostgreSQL `report_photos` and served only to the submitting citizen or municipality-scoped staff/admin account. No attachment is accepted until migration 006 is applied.
+Report photos are optional. The web and Android clients resize and JPEG-compress selected images to at most 2.5 MB before upload; the API also accepts JPEG, PNG, or WebP images up to 3 MB. Image bytes are stored in PostgreSQL `report_photos` in the same transaction as the report. The API serves them only to the submitting citizen or an authorized staff/admin account scoped to the report's municipality. Staff/admin queues include photo availability and load the image immediately with the report. Existing databases must have migration 006 applied.
 
 ### Windows PostgreSQL setup
 
@@ -107,5 +111,6 @@ token issued after password and email OTP verification.
 | `PATCH` | `/api/staff/phone` | Admin | Update a staff account's contact phone number |
 | `POST` | `/api/reports` | Public citizen client | Commit a report and broadcast the update |
 | `GET` | `/api/reports?externalRef=...` | Public citizen client | Read that citizen's database reports |
+| `GET` | `/api/reports/:id/photo` | Citizen owner or authorized staff/admin | Read a stored report photo |
 | `PATCH` | `/api/reports/:id/status` | Staff/admin | Update report status and audit trail |
 | `GET` | `/api/events` | Citizen ID or staff/admin | Server-sent live report updates |

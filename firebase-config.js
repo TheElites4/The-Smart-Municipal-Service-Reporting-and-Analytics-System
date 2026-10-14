@@ -1,9 +1,5 @@
-// firebase-config.js - Firebase Web SDK configuration for the MzansiConnect
-// staff and admin dashboards (Firebase email-link MFA).
-//
-// These values are NOT secrets - the Firebase web config is designed to be
-// public. Security comes from Firebase Security Rules and from the backend
-// verifying the ID token server-side (see POST /api/auth/firebase-email-verify).
+// Public Firebase Web SDK configuration retained for Firebase-integrated
+// features. Staff/admin dashboard MFA uses Gmail SMTP email codes through the API.
 //
 // Get the Web app values from the Firebase Console:
 //   Project settings (gear) -> General -> Your apps -> Web app (</>).
@@ -11,9 +7,6 @@
 // authDomain defaults to "<projectId>.firebaseapp.com" for that project, and
 // messagingSenderId equals the project_number in google-services.json.
 //
-// IMPORTANT: Firebase Email/Password email-link sign-in must be ENABLED in the console
-//   Build -> Authentication -> Sign-in method -> Phone  (and add a test number
-//   for local development). Web MFA does not work until this is switched on.
 window.MZANSI_FIREBASE_CONFIG = {
   apiKey: 'AIzaSyC-Jm001xMqk5gUNWPRQg0uCB7XlJswcVM',
   authDomain: 'mzansireport-e01b4.firebaseapp.com',

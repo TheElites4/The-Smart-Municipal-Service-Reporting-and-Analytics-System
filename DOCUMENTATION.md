@@ -251,7 +251,7 @@ essential to correct, non-empty staff queues and reliable analytics.
 | `GET` | `/health` | Public | API and PostgreSQL health |
 | `GET` | `/api/options` | Public | Categories and municipalities |
 | `POST` | `/api/auth/login` | Public | Check password and send MFA code |
-| `POST` | `/api/auth/verify-mfa` | Public | Verify code and issue token |
+| `POST` | `/api/auth/email/verify` | Public | Verify one-time email code and issue token |
 | `GET` | `/api/dashboard` | Staff/admin | Report queue and workforce summary |
 | `GET` | `/api/admin/analytics` | Admin | Report aggregates from PostgreSQL |
 | `POST` | `/api/reports` | Citizen client | Commit a report and broadcast update |

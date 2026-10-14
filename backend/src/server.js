@@ -2,7 +2,7 @@ import http from 'node:http';
 import { URL } from 'node:url';
 import crypto from 'node:crypto';
 import pg from 'pg';
-import { getGmailSettings, sendGmailLoginCode } from './gmail-api.js';
+import { getGmailSettings, sendGmailVerificationCode } from './gmail-api.js';
 import { totp } from './totp.js';
 
 const { Pool } = pg;
@@ -15,7 +15,7 @@ if (process.env.NODE_ENV === 'production' && (!process.env.AUTH_SECRET || proces
 }
 const corsHeaders = (req) => {
   const origin = req.headers.origin;
-  return { 'access-control-allow-origin': allowedOrigins.has('*') || allowedOrigins.has(origin) ? (origin || '*') : 'null', 'access-control-allow-methods': 'GET,POST,PATCH,OPTIONS', 'access-control-allow-headers': 'Content-Type, Authorization', 'vary': 'Origin' };
+  return { 'access-control-allow-origin': allowedOrigins.has('*') || allowedOrigins.has(origin) ? (origin || '*') : 'null', 'access-control-allow-methods': 'GET,POST,PATCH,DELETE,OPTIONS', 'access-control-allow-headers': 'Content-Type, Authorization', 'vary': 'Origin' };
 };
 
 const json = (res, status, body, req) => {
@@ -89,8 +89,7 @@ const emailOtpMaxAttempts = 5;
 const emailOtpCooldownSeconds = 60;
 const emailOtpHash = (code) => crypto.createHmac('sha256', authSecret).update(code).digest('hex');
 
-const createEmailOtpChallenge = async (account) => {
-  const gmailSettings = getGmailSettings();
+const createEmailOtpChallenge = async (account, purpose = 'sign-in', gmailSettings = getGmailSettings()) => {
   const code = String(crypto.randomInt(100000, 1000000));
   const challengeId = crypto.randomUUID();
   const client = await pool.connect();
@@ -104,10 +103,10 @@ const createEmailOtpChallenge = async (account) => {
     }
     const cooldown = await client.query(
       `SELECT created_at FROM auth_mfa_challenges
-        WHERE user_id = $1 AND delivery_method = 'email'
+        WHERE user_id = $1 AND delivery_method = 'email' AND purpose = $3
           AND created_at > now() - ($2::double precision * interval '1 second')
         ORDER BY created_at DESC LIMIT 1`,
-      [account.id, emailOtpCooldownSeconds]
+      [account.id, emailOtpCooldownSeconds, purpose]
     );
     if (cooldown.rows[0]) {
       throw Object.assign(new Error('A sign-in code was sent recently. Check your email before requesting another.'), { statusCode: 429 });
@@ -115,14 +114,15 @@ const createEmailOtpChallenge = async (account) => {
     await client.query(
       `UPDATE auth_mfa_challenges
           SET consumed_at = now()
-        WHERE user_id = $1 AND delivery_method = 'email' AND consumed_at IS NULL`,
-      [account.id]
+        WHERE user_id = $1 AND delivery_method = 'email'
+          AND purpose = $2 AND consumed_at IS NULL`,
+      [account.id, purpose]
     );
     await client.query(
       `INSERT INTO auth_mfa_challenges
-         (challenge_id, user_id, code_hash, delivery_method, expires_at)
-       VALUES ($1, $2, $3, 'email', now() + ($4::double precision * interval '1 minute'))`,
-      [challengeId, account.id, emailOtpHash(code), emailOtpTtlMinutes]
+         (challenge_id, user_id, code_hash, delivery_method, purpose, expires_at)
+       VALUES ($1, $2, $3, 'email', $4, now() + ($5::double precision * interval '1 minute'))`,
+      [challengeId, account.id, emailOtpHash(code), purpose, emailOtpTtlMinutes]
     );
     await client.query('COMMIT');
     transactionStarted = false;
@@ -134,15 +134,17 @@ const createEmailOtpChallenge = async (account) => {
   }
 
   try {
-    await sendGmailLoginCode({ to: account.email, fullName: account.full_name, code }, gmailSettings);
+    await sendGmailVerificationCode({ to: account.email, fullName: account.full_name, code, purpose }, gmailSettings);
   } catch (error) {
     await query('DELETE FROM auth_mfa_challenges WHERE challenge_id = $1', [challengeId]);
     if (error.statusCode) throw error;
     const upstreamStatus = error.upstreamStatus ? `, Google HTTP ${error.upstreamStatus}` : '';
     console.error(`Dashboard login code email could not be sent (${error.name || 'Error'}${upstreamStatus})`);
-    throw Object.assign(new Error('Unable to send a sign-in code. Check the Gmail API settings and try again.'), { statusCode: 503 });
+    const description = purpose === 'password-reset' ? 'password reset' : 'sign-in';
+    throw Object.assign(new Error(`Unable to send a ${description} code. Check the Gmail API settings and try again.`), { statusCode: 503 });
   }
 
+  if (purpose === 'password-reset') return null;
   return signToken({
     sub: account.id,
     role: account.role,
@@ -396,6 +398,110 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { token, expiresIn: tokenTtlSeconds, user: { id: account.id, fullName: account.full_name, email: account.email, role: account.role, municipality: account.municipality, department: account.department } }, req);
     }
 
+    if (req.method === 'POST' && url.pathname === '/api/auth/password/reset/request') {
+      const input = await body(req);
+      if (!hasFields(input, ['email'])) return json(res, 400, { error: 'Email is required' }, req);
+      const email = input.email.trim();
+      if (!/^[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+$/.test(email)) {
+        return json(res, 400, { error: 'Enter a valid email address' }, req);
+      }
+      const gmailSettings = getGmailSettings();
+      const result = await query(
+        `SELECT id, full_name, email, role
+           FROM app_users
+          WHERE lower(email) = lower($1) AND role IN ('staff', 'admin') AND is_active = true
+          LIMIT 1`,
+        [email]
+      );
+      if (result.rows[0]) {
+        try {
+          await createEmailOtpChallenge(result.rows[0], 'password-reset', gmailSettings);
+        } catch (error) {
+          if (error.statusCode !== 429) throw error;
+        }
+      }
+      return json(res, 200, {
+        message: 'If an active staff or administrator account matches that email, a verification code has been sent.',
+      }, req);
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/auth/password/reset/confirm') {
+      const input = await body(req);
+      if (!hasFields(input, ['email', 'code', 'password', 'confirmPassword'])) {
+        return json(res, 400, { error: 'Email, verification code, new password, and password confirmation are required' }, req);
+      }
+      const email = input.email.trim();
+      const code = input.code.trim();
+      if (!/^[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+$/.test(email)) {
+        return json(res, 400, { error: 'Enter a valid email address' }, req);
+      }
+      if (!/^\d{6}$/.test(code)) return json(res, 400, { error: 'Enter the 6-digit code from your email.' }, req);
+      if (input.password.length < 12) {
+        return json(res, 400, { error: 'New password must be at least 12 characters' }, req);
+      }
+      if (input.password !== input.confirmPassword) {
+        return json(res, 400, { error: 'The new password and confirmation do not match' }, req);
+      }
+
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const found = await client.query(
+          `SELECT c.challenge_id, c.code_hash, c.attempts, u.id
+             FROM auth_mfa_challenges c
+             JOIN app_users u ON u.id = c.user_id AND u.is_active = true
+            WHERE lower(u.email) = lower($1) AND u.role IN ('staff', 'admin')
+              AND c.delivery_method = 'email' AND c.purpose = 'password-reset'
+              AND c.consumed_at IS NULL AND c.expires_at > now() AND c.attempts < $2
+            ORDER BY c.created_at DESC LIMIT 1
+            FOR UPDATE OF c, u`,
+          [email, emailOtpMaxAttempts]
+        );
+        const challenge = found.rows[0];
+        if (!challenge) {
+          await client.query('COMMIT');
+          return json(res, 401, { error: 'That code is invalid or expired. Request a new password reset code.' }, req);
+        }
+
+        const submittedHash = Buffer.from(emailOtpHash(code), 'hex');
+        const storedHash = Buffer.from(challenge.code_hash, 'hex');
+        if (!crypto.timingSafeEqual(submittedHash, storedHash)) {
+          const attempts = challenge.attempts + 1;
+          await client.query(
+            `UPDATE auth_mfa_challenges
+                SET attempts = $2::smallint,
+                    consumed_at = CASE WHEN $2::integer >= $3::integer THEN now() ELSE consumed_at END
+              WHERE challenge_id = $1`,
+            [challenge.challenge_id, attempts, emailOtpMaxAttempts]
+          );
+          await client.query('COMMIT');
+          return json(res, attempts >= emailOtpMaxAttempts ? 429 : 401, {
+            error: attempts >= emailOtpMaxAttempts
+              ? 'Too many incorrect codes. Request a new password reset code.'
+              : 'That code is not valid. Check your email and try again.',
+          }, req);
+        }
+
+        await client.query(
+          `UPDATE app_users
+              SET password_hash = crypt($1, gen_salt('bf')), updated_at = now()
+            WHERE id = $2 AND is_active = true AND role IN ('staff', 'admin')`,
+          [input.password, challenge.id]
+        );
+        await client.query(
+          'UPDATE auth_mfa_challenges SET consumed_at = now() WHERE user_id = $1 AND consumed_at IS NULL',
+          [challenge.id]
+        );
+        await client.query('COMMIT');
+        return json(res, 200, { passwordUpdated: true }, req);
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+    }
+
     if (req.method === 'POST' && url.pathname === '/api/auth/email/verify') {
       const input = await body(req);
       if (typeof input.mfaToken !== 'string' || !hasFields(input, ['code'])) {
@@ -421,7 +527,7 @@ const server = http.createServer(async (req, res) => {
              FROM auth_mfa_challenges c
              JOIN app_users u ON u.id = c.user_id AND u.is_active = true
             WHERE c.challenge_id = $1 AND c.user_id = $2
-              AND c.delivery_method = 'email' AND c.consumed_at IS NULL
+              AND c.delivery_method = 'email' AND c.purpose = 'sign-in' AND c.consumed_at IS NULL
               AND c.expires_at > now() AND c.attempts < $3
             FOR UPDATE OF c`,
           [challenge.challengeId, challenge.sub, emailOtpMaxAttempts]
@@ -649,6 +755,21 @@ const server = http.createServer(async (req, res) => {
       if (!/^\+[1-9]\d{7,14}$/.test(input.phone.trim())) return json(res, 400, { error: 'Staff phone must be in international E.164 format, e.g. +27821234567' }, req);
       const result = await query(`INSERT INTO app_users (full_name, email, password_hash, role, municipality, department, phone) VALUES ($1, $2, crypt($3, gen_salt('bf')), 'staff', $4, $5, $6) RETURNING id, full_name, email, role, municipality, department, phone`, [input.fullName, input.email, input.password, input.municipality, input.department || null, input.phone.trim()]);
       return json(res, 201, result.rows[0], req);
+    }
+
+    const staffAccount = url.pathname.match(/^\/api\/staff\/([0-9a-f-]{36})$/i);
+    if (req.method === 'DELETE' && staffAccount) {
+      const admin = requireRole(req, url, ['admin']);
+      if (!admin) return json(res, 403, { error: 'Administrator access required' }, req);
+      const result = await query(
+        `UPDATE app_users
+            SET is_active = false, updated_at = now()
+          WHERE id = $1 AND role = 'staff' AND is_active = true
+          RETURNING id, full_name, email`,
+        [staffAccount[1]],
+      );
+      if (!result.rows[0]) return json(res, 404, { error: 'Active staff account not found' }, req);
+      return json(res, 200, { ...result.rows[0], isActive: false }, req);
     }
 
     if (req.method === 'PATCH' && url.pathname === '/api/staff/phone') {

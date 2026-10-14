@@ -18,6 +18,9 @@ window.MZANSI_FIREBASE_CONFIG = {
   databaseURL: 'https://mzansireport-e01b4-default-rtdb.firebaseio.com',
 };
 window.MZANSI_API_URL = 'https://mzansi-connect-api.onrender.com';
+window.MZANSI_HOME_URL = ['localhost', '127.0.0.1'].includes(window.location.hostname)
+  ? 'http://localhost:5173/'
+  : 'https://theelites4.github.io/The-Smart-Municipal-Service-Reporting-and-Analytics-System/';
 
 const firebaseConfigComplete =
   !!window.MZANSI_FIREBASE_CONFIG.appId &&

@@ -27,16 +27,18 @@ const database = new Client({ connectionString: databaseUrl });
 await database.connect();
 const testId = randomUUID();
 const staffEmail = `email-mfa-staff-${testId}@local.invalid`;
+const resetEmail = `email-reset-staff-${testId}@local.invalid`;
 const adminEmail = `email-mfa-admin-${testId}@local.invalid`;
 const failedEmail = `email-mfa-failed-${testId}@local.invalid`;
 const password = `email-mfa-test-${randomUUID()}`;
 const accounts = await database.query(
   `INSERT INTO app_users (full_name, email, role, password_hash)
-   VALUES ('Email MFA Staff Test', $1, 'staff', crypt($4, gen_salt('bf'))),
-          ('Email MFA Admin Test', $2, 'admin', crypt($4, gen_salt('bf'))),
-          ('Email MFA Failure Test', $3, 'staff', crypt($4, gen_salt('bf')))
+   VALUES ('Email MFA Staff Test', $1, 'staff', crypt($5, gen_salt('bf'))),
+          ('Email Reset Staff Test', $2, 'staff', crypt($5, gen_salt('bf'))),
+          ('Email MFA Admin Test', $3, 'admin', crypt($5, gen_salt('bf'))),
+          ('Email MFA Failure Test', $4, 'staff', crypt($5, gen_salt('bf')))
    RETURNING id, email, role`,
-  [staffEmail, adminEmail, failedEmail, password],
+  [staffEmail, resetEmail, adminEmail, failedEmail, password],
 );
 
 const collectBody = async (request) => {
@@ -168,10 +170,23 @@ const requestLoginCode = async (email) => {
   assert.ok(challenge.challengeId);
   const emailMessage = emails.findLast((message) => message.recipient?.toLowerCase() === email.toLowerCase());
   assert.ok(emailMessage, 'the Gmail API should deliver a login code to the account email');
-  assert.match(emailMessage.message, /^Subject: Your MzansiConnect sign-in code$/mi);
+  assert.match(emailMessage.message, /^Subject: Your MzansiConnect sign-in verification code$/mi);
   const code = emailMessage.text.match(/verification code is:\s*(\d{6})/i)?.[1];
   assert.ok(code, 'the email should contain a 6-digit login code');
   return { mfaToken: result.mfaToken, code };
+};
+
+const requestPasswordResetCode = async (email) => {
+  const response = await post('/api/auth/password/reset/request', { email });
+  const result = await response.json();
+  assert.equal(response.status, 200, result.error || `Unexpected HTTP ${response.status}`);
+  assert.match(result.message, /If an active staff or administrator account matches that email/);
+  const emailMessage = emails.findLast((message) => message.recipient?.toLowerCase() === email.toLowerCase());
+  assert.ok(emailMessage, 'the Gmail API should deliver a password reset code to the account email');
+  assert.match(emailMessage.message, /^Subject: Your MzansiConnect password reset verification code$/mi);
+  const code = emailMessage.text.match(/password reset verification code is:\s*(\d{6})/i)?.[1];
+  assert.ok(code, 'the password reset email should contain a 6-digit verification code');
+  return code;
 };
 
 test('staff email OTP is sent, required, single-use, and exchanged for a session', async () => {
@@ -193,6 +208,77 @@ test('staff email OTP is sent, required, single-use, and exchanged for a session
 
   const replay = await post('/api/auth/email/verify', { mfaToken, code });
   assert.equal(replay.status, 401, 'a consumed email code must not be reusable');
+});
+
+test('staff and admin passwords can only be reset using the emailed one-time code', async () => {
+  const resetCode = await requestPasswordResetCode(resetEmail);
+  const newPassword = `email-reset-test-${randomUUID()}`;
+  const wrongCode = resetCode === '000000' ? '000001' : '000000';
+  const rejected = await post('/api/auth/password/reset/confirm', {
+    email: resetEmail,
+    code: wrongCode,
+    password: newPassword,
+    confirmPassword: newPassword,
+  });
+  assert.equal(rejected.status, 401);
+
+  const invalidPassword = await post('/api/auth/password/reset/confirm', {
+    email: resetEmail,
+    code: resetCode,
+    password: 'short',
+    confirmPassword: 'short',
+  });
+  assert.equal(invalidPassword.status, 400);
+
+  const mismatch = await post('/api/auth/password/reset/confirm', {
+    email: resetEmail,
+    code: resetCode,
+    password: newPassword,
+    confirmPassword: `different-${randomUUID()}`,
+  });
+  assert.equal(mismatch.status, 400);
+
+  const confirmed = await post('/api/auth/password/reset/confirm', {
+    email: resetEmail,
+    code: resetCode,
+    password: newPassword,
+    confirmPassword: newPassword,
+  });
+  const result = await confirmed.json();
+  assert.equal(confirmed.status, 200, result.error || `Unexpected HTTP ${confirmed.status}`);
+  assert.equal(result.passwordUpdated, true);
+
+  const stored = await database.query(
+    'SELECT password_hash = crypt($1, password_hash) AS password_matches FROM app_users WHERE email = $2',
+    [newPassword, resetEmail],
+  );
+  assert.equal(stored.rows[0].password_matches, true);
+
+  const replayPassword = `another-reset-test-${randomUUID()}`;
+  const replay = await post('/api/auth/password/reset/confirm', {
+    email: resetEmail,
+    code: resetCode,
+    password: replayPassword,
+    confirmPassword: replayPassword,
+  });
+  assert.equal(replay.status, 401, 'a reset code must not be reusable');
+
+  const login = await post('/api/auth/login', { email: resetEmail, password: newPassword });
+  const loginResult = await login.json();
+  assert.equal(login.status, 200, loginResult.error || `Unexpected HTTP ${login.status}`);
+  assert.equal(loginResult.mfaRequired, 'email-otp', 'the new password must work for dashboard sign-in');
+});
+
+test('password reset requests do not disclose unknown accounts', async () => {
+  const emailsBefore = emails.length;
+  const response = await post('/api/auth/password/reset/request', {
+    email: `unknown-reset-${randomUUID()}@local.invalid`,
+  });
+  const result = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.match(result.message, /If an active staff or administrator account matches that email/);
+  assert.equal(emails.length, emailsBefore, 'unknown accounts must not receive email');
 });
 
 test('admin email OTP is also required before issuing a dashboard session', async () => {

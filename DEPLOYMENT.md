@@ -23,6 +23,7 @@ psql $env:DATABASE_URL -f backend/migrations/003_normalise_municipality.sql
 psql $env:DATABASE_URL -f backend/migrations/004_mfa_challenges.sql
 psql $env:DATABASE_URL -f backend/migrations/005_service_categories.sql
 psql $env:DATABASE_URL -f backend/migrations/006_municipalities_and_photos.sql
+psql $env:DATABASE_URL -f backend/migrations/008_email_password_reset.sql
 Set-Location backend
 npm.cmd run import:municipalities
 Set-Location ..
@@ -158,6 +159,7 @@ psql $env:DATABASE_URL -f backend/migrations/003_normalise_municipality.sql
 psql $env:DATABASE_URL -f backend/migrations/004_mfa_challenges.sql
 psql $env:DATABASE_URL -f backend/migrations/005_service_categories.sql
 psql $env:DATABASE_URL -f backend/migrations/006_municipalities_and_photos.sql
+psql $env:DATABASE_URL -f backend/migrations/008_email_password_reset.sql
 Set-Location backend
 npm.cmd run import:municipalities
 Set-Location ..

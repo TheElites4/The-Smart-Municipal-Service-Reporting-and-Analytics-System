@@ -27,7 +27,7 @@ const toCitizenReport = (report: any) => ({
 });
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<Screen>('dashboard');
+  const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   const [reports, setReports] = useState<any[]>([]);
   const [selectedReport, setSelectedReport] = useState<any>(null);
   const { language, setLanguage } = useTranslation();
@@ -164,7 +164,7 @@ export default function App() {
   if (currentScreen === 'home') {
     return (
       <HomePage
-        onGetStarted={() => setCurrentScreen('new-report')}
+        onGetStarted={() => setCurrentScreen('dashboard')}
         onLogin={() => setCurrentScreen('dashboard')}
         language={language}
         onLanguageChange={handleLanguageChange}

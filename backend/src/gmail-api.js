@@ -73,24 +73,27 @@ const getAccessToken = async (settings, fetchImpl) => {
   return cachedAccessToken;
 };
 
-const makeRawMessage = ({ to, fullName, code }, from) => {
+const makeRawMessage = ({ to, fullName, code, purpose = 'sign-in' }, from) => {
   if (!/^[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+$/.test(to)) {
     throw new GmailApiError('The account email address is not valid.');
   }
   const greeting = String(fullName || 'there').replace(/[\r\n]+/g, ' ').trim() || 'there';
+  const passwordReset = purpose === 'password-reset';
   const text = [
     `Hello ${greeting},`,
     '',
-    `Your MzansiConnect dashboard verification code is: ${code}`,
+    `Your MzansiConnect dashboard ${passwordReset ? 'password reset' : 'sign-in'} verification code is: ${code}`,
     'It expires in 5 minutes and can only be used once.',
     '',
-    'If you did not try to sign in, you can ignore this email.',
+    passwordReset
+      ? 'If you did not request a password reset, you can ignore this email. Your password will not change unless the code is used.'
+      : 'If you did not try to sign in, you can ignore this email.',
   ].join('\n');
   const encodedBody = Buffer.from(text, 'utf8').toString('base64').match(/.{1,76}/g).join('\r\n');
   const message = [
     `From: MzansiConnect <${from}>`,
     `To: ${to}`,
-    'Subject: Your MzansiConnect sign-in code',
+    `Subject: Your MzansiConnect ${passwordReset ? 'password reset' : 'sign-in'} verification code`,
     'MIME-Version: 1.0',
     'Content-Type: text/plain; charset=UTF-8',
     'Content-Transfer-Encoding: base64',
@@ -100,9 +103,9 @@ const makeRawMessage = ({ to, fullName, code }, from) => {
   return Buffer.from(message, 'utf8').toString('base64url');
 };
 
-export const sendGmailLoginCode = async ({ to, fullName, code }, settings, fetchImpl = fetch) => {
+export const sendGmailVerificationCode = async ({ to, fullName, code, purpose }, settings, fetchImpl = fetch) => {
   const accessToken = await getAccessToken(settings, fetchImpl);
-  const raw = makeRawMessage({ to, fullName, code }, settings.user);
+  const raw = makeRawMessage({ to, fullName, code, purpose }, settings.user);
   let response;
   try {
     response = await fetchImpl(gmailSendUrl, {

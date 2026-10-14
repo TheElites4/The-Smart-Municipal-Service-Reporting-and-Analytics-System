@@ -14,6 +14,7 @@ const setupFiles = [
   'migrations/004_mfa_challenges.sql',
   'migrations/005_service_categories.sql',
   'migrations/006_municipalities_and_photos.sql',
+  'migrations/008_email_password_reset.sql',
 ];
 const client = new pg.Client({ connectionString: databaseUrl });
 const lockId = '83420917231';

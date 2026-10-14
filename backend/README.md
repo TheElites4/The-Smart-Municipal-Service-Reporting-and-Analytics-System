@@ -5,7 +5,7 @@ The shared system of record for the citizen portal, Android client, staff operat
 ## Local setup
 
 1. Create a PostgreSQL database and set `DATABASE_URL`.
-2. Apply `schema.sql`, then migrations `002_external_ref.sql`, `003_normalise_municipality.sql`, `004_mfa_challenges.sql`, `005_service_categories.sql`, and `006_municipalities_and_photos.sql`.
+2. Apply `schema.sql`, then migrations `002_external_ref.sql`, `003_normalise_municipality.sql`, `004_mfa_challenges.sql`, `005_service_categories.sql`, `006_municipalities_and_photos.sql`, and `008_email_password_reset.sql`.
 3. Copy `.env.example` to `.env`, configure a unique `AUTH_SECRET`, Gmail API OAuth credentials (`GMAIL_USER`, `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, and `GMAIL_REFRESH_TOKEN`), and ensure each staff/admin account has a reachable email address. Then run `npm.cmd install`, `npm.cmd run check`, and `./start-local.ps1` on Windows.
 4. Import the 257 municipality records into the new table: `npm.cmd run import:municipalities`. The importer aborts unless it reads exactly 8 metropolitan, 44 district, and 205 local municipalities; it does not silently publish a partial list.
 
@@ -19,10 +19,12 @@ for the registered-phone management endpoint.
 Run `npm.cmd run test:report-photo` with the local API and database running to
 verify image upload, PostgreSQL persistence, and authorized dashboard retrieval.
 Run `npm.cmd run test:auth-email-mfa` to verify staff and admin email-code login
-using a local Gmail API mock and database.
+using a local Gmail API mock and database. The same test covers password reset
+codes, incorrect and reused codes, password updates, and non-enumerating
+responses for unknown email addresses.
 
 For an empty database, `npm.cmd run setup:database` applies the base schema and
-five migrations in order as a single transaction. It refuses to run if
+the supported migrations in order as a single transaction. It refuses to run if
 `app_users` already exists; continue using the individual migrations for an
 existing database. The [Render setup instructions](../Citizen%20Portal%20Mobile%20App/README.md#publish-on-github-pages)
 cover securely initializing a new hosted database and importing municipalities.
@@ -46,6 +48,7 @@ psql -U postgres -h localhost -d mzansi_connect -f migrations/002_external_ref.s
 psql -U postgres -h localhost -d mzansi_connect -f migrations/003_normalise_municipality.sql
 psql -U postgres -h localhost -d mzansi_connect -f migrations/004_mfa_challenges.sql
 psql -U postgres -h localhost -d mzansi_connect -f migrations/005_service_categories.sql
+psql -U postgres -h localhost -d mzansi_connect -f migrations/008_email_password_reset.sql
 psql -U postgres -h localhost -d mzansi_connect -f seed.sql
 ```
 

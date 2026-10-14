@@ -11,6 +11,11 @@ const STAFF_DASHBOARD_URL =
   import.meta.env.VITE_STAFF_DASHBOARD_URL || 'http://localhost:8080/Staff%20Dashboard/';
 const ADMIN_DASHBOARD_URL =
   import.meta.env.VITE_ADMIN_DASHBOARD_URL || 'http://localhost:8080/Admin%20Dashboard/';
+const dashboardLoginUrl = (dashboardUrl: string) => {
+  const url = new URL(dashboardUrl, window.location.href);
+  url.searchParams.set('login', '1');
+  return url.toString();
+};
 
 interface HomePageProps {
   onGetStarted: () => void;
@@ -125,7 +130,7 @@ export function HomePage({ onGetStarted, onLogin, language, onLanguageChange }: 
               {dashboardsOpen && (
                 <div className="absolute left-1/2 -translate-x-1/2 mt-2 w-64 rounded-xl bg-white shadow-2xl border border-border overflow-hidden z-50">
                   <a
-                    href={STAFF_DASHBOARD_URL}
+                    href={dashboardLoginUrl(STAFF_DASHBOARD_URL)}
                     className="flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
                   >
                     <span className="w-9 h-9 rounded-lg bg-[#4a8f8f]/15 flex items-center justify-center flex-shrink-0">
@@ -137,7 +142,7 @@ export function HomePage({ onGetStarted, onLogin, language, onLanguageChange }: 
                     </span>
                   </a>
                   <a
-                    href={ADMIN_DASHBOARD_URL}
+                    href={dashboardLoginUrl(ADMIN_DASHBOARD_URL)}
                     className="flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors border-t border-border"
                   >
                     <span className="w-9 h-9 rounded-lg bg-[#FFB612]/20 flex items-center justify-center flex-shrink-0">

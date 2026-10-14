@@ -88,6 +88,7 @@ CREATE TABLE auth_mfa_challenges (
   user_id UUID NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
   code_hash TEXT NOT NULL,
   delivery_method TEXT NOT NULL CHECK (delivery_method IN ('email', 'sms')),
+  purpose TEXT NOT NULL DEFAULT 'sign-in' CHECK (purpose IN ('sign-in', 'password-reset')),
   attempts SMALLINT NOT NULL DEFAULT 0 CHECK (attempts BETWEEN 0 AND 5),
   expires_at TIMESTAMPTZ NOT NULL,
   consumed_at TIMESTAMPTZ,

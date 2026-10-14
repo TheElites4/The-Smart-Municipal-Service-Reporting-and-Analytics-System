@@ -1,5 +1,11 @@
 const API = localStorage.getItem('mzansiApiUrl') || (['localhost', '127.0.0.1'].includes(location.hostname) ? 'http://localhost:8787' : window.MZANSI_API_URL || 'http://localhost:8787');
 const TOKEN_KEY = 'mzansiAdminToken';
+if (new URLSearchParams(location.search).get('login') === '1') localStorage.removeItem(TOKEN_KEY);
+const passwordResetScript = document.createElement('script');
+passwordResetScript.src = '../dashboard-password-reset.js';
+passwordResetScript.dataset.api = API;
+passwordResetScript.dataset.role = 'admin';
+document.head.append(passwordResetScript);
 const $ = (id) => document.getElementById(id);
 if ($('mfa-hint')) $('mfa-hint').textContent = 'Enter the one-time code we sent to your email.';
 if ($('mfa-code')) $('mfa-code').closest('label').firstChild.textContent = 'Email verification code';
@@ -312,7 +318,7 @@ async function load() {
     ['in_progress', 'Active jobs', 'bolt', 'tone-active'],
     ['resolved', 'Resolved / closed', 'check', 'tone-resolved'],
   ].map(([key, label, icon, tone]) => `<div class="stat ${tone}"><span class="stat-icon">${icons[icon]}</span><strong>${data.summary[key] || 0}</strong><span>${label}</span></div>`).join('');
-  $('staff').innerHTML = data.staff.length ? data.staff.map((person) => { const loadValue = Math.min(100, (person.open_jobs || 0) * 12); const hot = (person.open_jobs || 0) >= 5; return `<div class="person"><span class="avatar">${esc(initials(person.full_name))}</span><div class="person-body"><div class="person-top"><div><h3>${esc(person.full_name)}</h3><small>${esc(person.department || 'Municipal services')} · ${esc(person.municipality || 'Unassigned')}</small></div><span class="badge ${person.is_active ? '' : 'off'}">${person.is_active ? 'Active' : 'Inactive'}</span></div><small>${person.open_jobs || 0} open assignments · last seen ${person.last_seen_at ? new Date(person.last_seen_at).toLocaleString() : 'never'}</small><div class="bar ${hot ? 'hot' : ''}"><b style="width:${loadValue}%"></b></div></div></div>`; }).join('') : `<div class="empty-state">${icons.inbox}<div>No staff records found.</div></div>`;
+  $('staff').innerHTML = data.staff.length ? data.staff.map((person) => { const loadValue = Math.min(100, (person.open_jobs || 0) * 12); const hot = (person.open_jobs || 0) >= 5; return `<div class="person"><span class="avatar">${esc(initials(person.full_name))}</span><div class="person-body"><div class="person-top"><div><h3>${esc(person.full_name)}</h3><small>${esc(person.department || 'Municipal services')} · ${esc(person.municipality || 'Unassigned')}</small></div><span class="badge ${person.is_active ? '' : 'off'}">${person.is_active ? 'Active' : 'Inactive'}</span></div><small>${person.open_jobs || 0} open assignments · last seen ${person.last_seen_at ? new Date(person.last_seen_at).toLocaleString() : 'never'}</small><div class="bar ${hot ? 'hot' : ''}"><b style="width:${loadValue}%"></b></div>${person.is_active ? `<button type="button" class="staff-deactivate" data-staff-id="${encodeURIComponent(person.id)}" data-staff-name="${esc(person.full_name)}">Deactivate staff</button>` : ''}</div></div>`; }).join('') : `<div class="empty-state">${icons.inbox}<div>No staff records found.</div></div>`;
   const recentReports = data.reports.slice(0, 8);
   retainReportPhotoUrls(recentReports.filter((report) => report.has_photo).map((report) => report.id));
   $('reports').innerHTML = recentReports.map((report) => `<div class="report"><div class="report-top"><div><span class="report-ref"><span class="dot"></span><span class="reference">${esc(report.public_reference)}</span></span><h3>${esc(report.category)}</h3></div><span class="priority ${esc(String(report.urgency).toLowerCase())}">${esc(report.urgency)}</span></div><p>${esc(report.description)}</p>${report.has_photo ? `<figure class="report-photo"><img alt="Evidence photo for ${esc(report.public_reference)}" hidden><figcaption>Loading evidence photo…</figcaption></figure>` : ''}<div class="report-meta"><span class="chip">${esc(report.location_text)}</span><span class="chip">${esc(report.status.replaceAll('_', ' '))}</span></div></div>`).join('') || `<div class="empty-state">${icons.inbox}<div>No reports found.</div></div>`;
@@ -397,6 +403,27 @@ staffForm.addEventListener('submit', async (event) => {
     toast('Network error — is the API running?', true);
   } finally {
     submit.disabled = false;
+  }
+});
+$('staff').addEventListener('click', async (event) => {
+  const button = event.target.closest('.staff-deactivate');
+  if (!button) return;
+  const staffName = button.dataset.staffName || 'this staff member';
+  if (!window.confirm(`Deactivate ${staffName}? They will no longer be able to sign in. Their assignments and history will be retained.`)) return;
+
+  button.disabled = true;
+  try {
+    const response = await fetch(`${API}/api/staff/${button.dataset.staffId}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Unable to deactivate staff account');
+    toast(`${result.full_name} has been deactivated.`);
+    await load();
+  } catch (error) {
+    toast(error instanceof Error ? error.message : 'Unable to deactivate staff account', true);
+    button.disabled = false;
   }
 });
 $('refresh').onclick = () => { const button = $('refresh'); button.disabled = true; load().then(() => toast('Dashboard refreshed')).catch(() => { $('health').textContent = 'Offline'; toast('Could not reach the API', true); }).finally(() => { button.disabled = false; }); };

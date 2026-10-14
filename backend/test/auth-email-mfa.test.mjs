@@ -58,6 +58,7 @@ const findFreePort = async () => {
 
 const emails = [];
 let rejectNextGmailSend = false;
+let mockOAuthScope = 'https://www.googleapis.com/auth/gmail.send';
 const gmailApiMock = http.createServer(async (request, response) => {
   const requestBody = await collectBody(request);
   if (request.method === 'POST' && request.url === '/token') {
@@ -69,8 +70,8 @@ const gmailApiMock = http.createServer(async (request, response) => {
     response.writeHead(200, { 'content-type': 'application/json' });
     response.end(JSON.stringify({
       access_token: 'test-access-token',
-      expires_in: 3600,
-      scope: 'https://www.googleapis.com/auth/gmail.send',
+      expires_in: 1,
+      scope: mockOAuthScope,
     }));
     return;
   }
@@ -204,6 +205,16 @@ test('admin email OTP is also required before issuing a dashboard session', asyn
 });
 
 test('Gmail API delivery failures do not create a usable email OTP challenge', async () => {
+  mockOAuthScope = 'https://www.googleapis.com/auth/gmail.readonly';
+  const scopeResponse = await post('/api/auth/login', { email: failedEmail, password });
+  const scopeResult = await scopeResponse.json();
+
+  assert.equal(scopeResponse.status, 503);
+  assert.match(scopeResult.error, /missing the required https:\/\/www\.googleapis\.com\/auth\/gmail\.send permission/);
+  assert.equal(scopeResult.mfaRequired, undefined);
+  assert.equal(scopeResult.token, undefined);
+
+  mockOAuthScope = 'https://www.googleapis.com/auth/gmail.send';
   rejectNextGmailSend = true;
   const response = await post('/api/auth/login', { email: failedEmail, password });
   const result = await response.json();

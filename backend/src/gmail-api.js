@@ -57,10 +57,16 @@ const getAccessToken = async (settings, fetchImpl) => {
     throw new GmailApiError('Google OAuth token service could not be reached.');
   }
   const token = await responseJson(response, 'Google OAuth token request');
-  if (typeof token.access_token !== 'string' || !token.access_token ||
-      typeof token.expires_in !== 'number' || token.expires_in <= 0 ||
-      (token.scope && !token.scope.split(/\s+/).includes(gmailSendScope))) {
-    throw new GmailApiError('Google OAuth returned no usable Gmail send access token.');
+  if (typeof token.access_token !== 'string' || !token.access_token) {
+    throw new GmailApiError('Google OAuth returned no access token. Check the OAuth client and refresh token configured in Render.');
+  }
+  if (typeof token.expires_in !== 'number' || !Number.isFinite(token.expires_in) || token.expires_in <= 0) {
+    throw new GmailApiError('Google OAuth returned an invalid access-token expiry. Re-authorize the Gmail account and replace GMAIL_REFRESH_TOKEN in Render.');
+  }
+  if (token.scope && !token.scope.split(/\s+/).includes(gmailSendScope)) {
+    throw new GmailApiError(
+      `The Gmail refresh token is missing the required ${gmailSendScope} permission. Re-authorize the sending account with this scope, then replace GMAIL_REFRESH_TOKEN in Render.`
+    );
   }
   cachedAccessToken = token.access_token;
   cachedAccessTokenExpiresAt = Date.now() + token.expires_in * 1000;

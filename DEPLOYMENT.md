@@ -64,6 +64,11 @@ node serve-static.mjs
 
    Admin: `http://localhost:8080/Admin%20Dashboard/`
 
+   Both dashboards use the API URL in `firebase-config.js` by default, so
+   separate browsers use the same backend and database. To explicitly use the
+   local API for development, set `localStorage.setItem('mzansiApiUrl',
+   'http://localhost:8787')` in that browser's developer console and reload.
+
 4. In another terminal, run the citizen web app:
 
 ```powershell

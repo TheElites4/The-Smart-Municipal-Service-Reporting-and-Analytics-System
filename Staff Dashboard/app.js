@@ -1,4 +1,4 @@
-const API = localStorage.getItem('mzansiApiUrl') || (['localhost', '127.0.0.1'].includes(location.hostname) ? 'http://localhost:8787' : window.MZANSI_API_URL || 'http://localhost:8787');
+const API = localStorage.getItem('mzansiApiUrl') || window.MZANSI_API_URL || 'http://localhost:8787';
 const $ = (id) => document.getElementById(id);
 const tokenKey = 'mzansiStaffToken';
 if (new URLSearchParams(location.search).get('login') === '1') localStorage.removeItem(tokenKey);

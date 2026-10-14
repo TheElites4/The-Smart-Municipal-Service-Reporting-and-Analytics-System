@@ -174,6 +174,13 @@ psql $env:DATABASE_URL -f backend/seed.sql
 4. Set `AUTH_SECRET` to a long random value, then start the API from `backend` with `npm install` and `npm start`.
 5. Verify `GET http://localhost:8787/health` returns `database: connected`.
 
+If staff/admin sign-in returns a generic server error after password validation,
+the hosted database may be missing the email-MFA challenge schema. Set
+`DATABASE_URL` to the existing database's connection URL and run
+`npm.cmd run migrate:email-mfa` from `backend`. This applies migrations 004 and
+008 transactionally, refuses an uninitialized database, and is safe to repeat.
+Keep the connection URL private.
+
 The seeded dashboard accounts are:
 
 - Staff: `staff@example.gov.za` / `ChangeMeStaff!2026`

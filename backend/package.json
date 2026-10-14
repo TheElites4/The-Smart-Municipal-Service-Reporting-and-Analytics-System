@@ -7,6 +7,7 @@
     "start": "node src/server.js",
     "check": "node --check src/server.js && node --check scripts/setup-database.mjs",
     "check:deployment": "node scripts/check-deployment.mjs",
+    "migrate:email-mfa": "node scripts/apply-email-mfa-migrations.mjs",
     "test:municipalities": "node --test --test-reporter=dot test/municipalities.test.mjs",
     "test:staff-phone": "node --test test/staff-phone-api.test.mjs",
     "test:report-photo": "node --test test/report-photo.test.mjs",

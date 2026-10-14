@@ -1,11 +1,8 @@
 const API = localStorage.getItem('mzansiApiUrl') || window.MZANSI_API_URL || 'http://localhost:8787';
 const TOKEN_KEY = 'mzansiAdminToken';
+const dashboardBack = document.getElementById('dashboard-back');
+if (dashboardBack && window.MZANSI_HOME_URL) dashboardBack.href = window.MZANSI_HOME_URL;
 if (new URLSearchParams(location.search).get('login') === '1') localStorage.removeItem(TOKEN_KEY);
-const passwordResetScript = document.createElement('script');
-passwordResetScript.src = '../dashboard-password-reset.js';
-passwordResetScript.dataset.api = API;
-passwordResetScript.dataset.role = 'admin';
-document.head.append(passwordResetScript);
 const $ = (id) => document.getElementById(id);
 if ($('mfa-hint')) $('mfa-hint').textContent = 'Enter the one-time code we sent to your email.';
 if ($('mfa-code')) $('mfa-code').closest('label').firstChild.textContent = 'Email verification code';

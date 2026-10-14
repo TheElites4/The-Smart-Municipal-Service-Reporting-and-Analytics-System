@@ -1,12 +1,9 @@
 const API = localStorage.getItem('mzansiApiUrl') || window.MZANSI_API_URL || 'http://localhost:8787';
 const $ = (id) => document.getElementById(id);
+const dashboardBack = $('dashboard-back');
+if (dashboardBack && window.MZANSI_HOME_URL) dashboardBack.href = window.MZANSI_HOME_URL;
 const tokenKey = 'mzansiStaffToken';
 if (new URLSearchParams(location.search).get('login') === '1') localStorage.removeItem(tokenKey);
-const passwordResetScript = document.createElement('script');
-passwordResetScript.src = '../dashboard-password-reset.js';
-passwordResetScript.dataset.api = API;
-passwordResetScript.dataset.role = 'staff';
-document.head.append(passwordResetScript);
 let liveConnection;
 let latestReports = [];
 let pollTimer; // fallback refresh so new citizen reports appear even if the live stream drops
